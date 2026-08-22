@@ -243,7 +243,30 @@ border-top: 15px solid #c1442e; z-index: 2; filter: drop-shadow(0 1px 1px rgba(0
 .exitBody { height: 100%; display: flex; flex-direction: column; }
 .exitQWrap { padding: 8px; background: #efeade; border-bottom: 1px solid #dcd6c6; }
 .exitQLabel { display: block; font-size: 10px; font-weight: 700; color: #6b6152; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
-.exitQInput { width: 100%; border: 1px solid #c9c2ac; border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 44px; box-sizing: border-box; }
+/* ––––– Rich text editor (Bellwork, Quick Note, Exit Slip question) ––––– */
+.richWrap { height: 100%; display: flex; flex-direction: column; }
+.richToolbar {
+display: flex; gap: 4px; align-items: center; padding: 6px 8px; background: #efeade;
+border-bottom: 1px solid #dcd6c6; flex-shrink: 0; flex-wrap: wrap;
+}
+.richBtn {
+width: 26px; height: 26px; border: 1px solid #c9c2ac; border-radius: 5px; background: #fff;
+color: #4a4030; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.richBtn:active { background: #e7e2d6; }
+.richSizeSelect {
+border: 1px solid #c9c2ac; border-radius: 5px; background: #fff; color: #4a4030;
+font-size: 12px; padding: 4px 6px;
+}
+.richColor { width: 28px; height: 26px; border: 1px solid #c9c2ac; border-radius: 5px; padding: 1px; cursor: pointer; background: #fff; }
+.richEditable {
+flex: 1; overflow: auto; padding: 14px 16px; font-size: 16px; line-height: 1.5;
+font-family: -apple-system, sans-serif; color: #2b2318; background: #fffdf7; outline: none;
+}
+.richEditable img { max-width: 100%; border-radius: 6px; display: block; margin: 6px 0; }
+.richEditable:empty:before { content: attr(data-placeholder); color: #a89f8c; pointer-events: none; }
+.exitQRich .richToolbar { padding: 4px 6px; }
+.exitQRich .richEditable { flex: none; min-height: 50px; max-height: 140px; padding: 8px; font-size: 13px; background: #fff; }
 
 /* ––––– Dock (minimized / off-screen tabs) ––––– */
 #dock {
@@ -508,8 +531,8 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
       ".winHead{background:"+t.winHead+" !important;border-bottom-color:"+t.winHeadBorder+" !important;}" +
       ".winTitle{color:"+t.winText+" !important;}" +
       ".winBtn{color:"+t.winText+" !important;}" +
-      ".bellworkArea{background:"+t.bodyBg+" !important;}" +
-      ".ytInputRow, .ansToolbar{background:"+t.winHead+" !important;border-bottom-color:"+t.winHeadBorder+" !important;}" +
+      ".bellworkArea, .richEditable{background:"+t.bodyBg+" !important;}" +
+      ".ytInputRow, .ansToolbar, .richToolbar{background:"+t.winHead+" !important;border-bottom-color:"+t.winHeadBorder+" !important;}" +
       ".resizeHandle{background:linear-gradient(135deg, transparent 50%, "+t.winHeadBorder+" 50%) !important;}" +
       ".tBtn{background:"+t.winHeadBorder+" !important;color:"+t.winText+" !important;}" +
       ".tBtn.go{background:"+t.accent+" !important;color:#fff !important;}" +
@@ -776,10 +799,14 @@ popup.document.close();
 
 var target = popup.document.getElementById("c");
 if (w.type === "bellwork"){
-  var ta = popup.document.createElement("textarea");
-  ta.value = w.content || "";
-  ta.oninput = function(){ w.content = ta.value; saveState(); };
-  target.appendChild(ta);
+  var ed = popup.document.createElement("div");
+  ed.contentEditable = "true";
+  ed.style.cssText = "width:100%;height:80vh;padding:14px;font-size:16px;line-height:1.5;outline:none;overflow:auto;box-sizing:border-box;";
+  var raw = w.content || "";
+  var looksHtml = /<[a-z][\s\S]*>/i.test(raw);
+  ed.innerHTML = looksHtml ? raw : escapeHtml(raw).replace(/\n/g, "<br>");
+  ed.oninput = function(){ w.content = ed.innerHTML; saveState(); };
+  target.appendChild(ed);
 } else if (w.type === "answers"){
   var refresh = function(){
     target.innerHTML = "";
@@ -807,6 +834,66 @@ if (w.type === "bellwork"){
 }
 
 /* ============================================================
+RICH TEXT EDITOR (bold/underline/size/color + image paste)
+============================================================ */
+function buildRichEditor(w, field, placeholder, extraClass){
+var wrap = document.createElement("div");
+wrap.className = "richWrap" + (extraClass ? " " + extraClass : "");
+wrap.innerHTML =
+  '<div class="richToolbar">' +
+    '<button type="button" class="richBtn richBoldBtn" title="Bold"><b>B</b></button>' +
+    '<button type="button" class="richBtn richUnderlineBtn" title="Underline"><u>U</u></button>' +
+    '<select class="richSizeSelect" title="Font size">' +
+      '<option value="2">Small</option>' +
+      '<option value="3" selected>Normal</option>' +
+      '<option value="4">Large</option>' +
+      '<option value="5">X-Large</option>' +
+      '<option value="6">XX-Large</option>' +
+    '</select>' +
+    '<input type="color" class="richColor" title="Text color" value="#2b2318">' +
+  '</div>' +
+  '<div class="richEditable" contenteditable="true" data-placeholder="' + escapeHtml(placeholder||"") + '"></div>';
+
+var editable = wrap.querySelector(".richEditable");
+var raw = w[field] || "";
+var looksHtml = /<[a-z][\s\S]*>/i.test(raw);
+editable.innerHTML = looksHtml ? raw : escapeHtml(raw).replace(/\n/g, "<br>");
+
+function persist(){ w[field] = editable.innerHTML; saveState(); }
+
+wrap.querySelector(".richBoldBtn").onclick = function(){ editable.focus(); document.execCommand("bold"); persist(); };
+wrap.querySelector(".richUnderlineBtn").onclick = function(){ editable.focus(); document.execCommand("underline"); persist(); };
+wrap.querySelector(".richSizeSelect").onchange = function(e){ editable.focus(); document.execCommand("fontSize", false, e.target.value); persist(); };
+wrap.querySelector(".richColor").oninput = function(e){ editable.focus(); document.execCommand("foreColor", false, e.target.value); persist(); };
+
+editable.addEventListener("input", persist);
+editable.addEventListener("paste", function(e){
+  var cd = e.clipboardData || window.clipboardData;
+  var items = cd && cd.items;
+  if (items){
+    for (var i=0;i<items.length;i++){
+      if (items[i].type && items[i].type.indexOf("image") !== -1){
+        e.preventDefault();
+        var blob = items[i].getAsFile();
+        if (!blob) continue;
+        var reader = new FileReader();
+        reader.onload = function(ev){
+          editable.focus();
+          document.execCommand("insertHTML", false, '<img src="' + ev.target.result + '">');
+          persist();
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+    }
+  }
+  setTimeout(persist, 0);
+});
+
+return wrap;
+}
+
+/* ============================================================
 BUILD WINDOW BODIES BY TYPE
 ============================================================ */
 function buildBody(w){
@@ -814,12 +901,7 @@ var wrap = document.createElement("div");
 wrap.style.height = "100%";
 
 if (w.type === "bellwork"){
-  var ta = document.createElement("textarea");
-  ta.className = "bellworkArea";
-  ta.value = w.content || "";
-  ta.placeholder = "Type today's bellwork and lesson plan here...";
-  ta.oninput = function(){ w.content = ta.value; saveState(); };
-  wrap.appendChild(ta);
+  wrap.appendChild(buildRichEditor(w, "content", "Type today's bellwork and lesson plan here..."));
 }
 
 else if (w.type === "timer"){
@@ -1117,14 +1199,12 @@ else if (w.type === "exitslip"){
   var body6 = document.createElement("div");
   body6.className = "exitBody";
   body6.innerHTML =
-    '<div class="exitQWrap"><label class="exitQLabel">Today\'s Exit Slip Question</label><textarea class="exitQInput" placeholder="Type the exit slip question here..."></textarea></div>' +
+    '<div class="exitQWrap"><label class="exitQLabel">Today\'s Exit Slip Question</label></div>' +
     '<div class="ansToolbar"><input placeholder="Simulate: student name" class="simName"><input placeholder="answer text" class="simText"><button>Add</button></div>' +
     '<div class="ansFeed"></div>';
   wrap.appendChild(body6);
 
-  var qInput = body6.querySelector(".exitQInput");
-  qInput.value = w.question || "";
-  qInput.oninput = function(){ w.question = qInput.value; saveState(); };
+  body6.querySelector(".exitQWrap").appendChild(buildRichEditor(w, "question", "Type the exit slip question here...", "exitQRich"));
 
   var feedEl2 = body6.querySelector(".ansFeed");
   function refreshFeed2(){
@@ -1726,12 +1806,8 @@ var origBuildBody = buildBody;
 buildBody = function(w){
 if (w.type === "note"){
 var wrap = document.createElement("div");
-var ta = document.createElement("textarea");
-ta.className = "bellworkArea";
-ta.placeholder = "Quick note…";
-ta.value = w.content || "";
-ta.oninput = function(){ w.content = ta.value; saveState(); };
-wrap.appendChild(ta);
+wrap.style.height = "100%";
+wrap.appendChild(buildRichEditor(w, "content", "Quick note…"));
 return wrap;
 }
 if (w.type === "clock"){
