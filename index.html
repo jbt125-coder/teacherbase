@@ -136,7 +136,7 @@ display: flex; flex-direction: column; align-items: center; justify-content: cen
 height: 100%; gap: 10px; padding: 10px;
 }
 .timerDigits {
-font-family: “SF Mono”, “Menlo”, monospace; font-size: 15vmin; max-font-size: 54px;
+font-family: "SF Mono", "Menlo", monospace; font-size: 15vmin; max-font-size: 54px;
 font-size: clamp(30px, 12vmin, 60px);
 font-weight: 700; color: #1d3d3a; letter-spacing: 1px;
 }
@@ -198,7 +198,7 @@ flex: 1; border: 1px solid #c9c2ac; border-radius: 6px; padding: 6px 8px; font-s
 border: none; border-radius: 6px; padding: 6px 10px; background: #6b6152; color: #fff;
 font-size: 11px; font-weight: 700; cursor: pointer;
 }
-.ansFeed { flex: 1; overflow: auto; padding: 8px; font-family: “SF Mono”, Menlo, monospace; font-size: 12px; }
+.ansFeed { flex: 1; overflow: auto; padding: 8px; font-family: "SF Mono", Menlo, monospace; font-size: 12px; }
 .ansItem {
 background: #fff; border: 1px solid #e2ddcf; border-radius: 7px; padding: 7px 9px; margin-bottom: 6px;
 }
@@ -636,7 +636,6 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
       ".content{padding:16px;font-size:15px;line-height:1.5;white-space:pre-wrap;}" +
       "textarea{width:100%;height:80vh;border:none;padding:14px;font-size:16px;font-family:inherit;box-sizing:border-box;}</style></head><body>" +
 
-```
   "<div class='hdr'>" + escapeHtml(w.title) + " &mdash; drag this window to your second monitor</div>" +
   "<div class='content' id='c'></div>" +
   "</body></html>"
@@ -672,7 +671,6 @@ if (w.type === "bellwork"){
 } else {
   target.textContent = "Live view of \"" + w.title + "\" — this content type doesn't pop out with full interactivity yet, but you can keep it visible here for your second screen.";
 }
-```
 
 }
 
@@ -680,10 +678,9 @@ if (w.type === "bellwork"){
 BUILD WINDOW BODIES BY TYPE
 ============================================================ */
 function buildBody(w){
-var wrap = document.createElement(“div”);
-wrap.style.height = “100%”;
+var wrap = document.createElement("div");
+wrap.style.height = "100%";
 
-```
 if (w.type === "bellwork"){
   var ta = document.createElement("textarea");
   ta.className = "bellworkArea";
@@ -837,20 +834,19 @@ else if (w.type === "answers"){
 }
 
 return wrap;
-```
 
 }
 
 function extractYouTubeId(url){
 if (!url) return null;
-var m = url.match(/(?:youtu.be/|youtube.com/(?:watch?v=|embed/|shorts/))([A-Za-z0-9_-]{6,})/);
+var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
 return m ? m[1] : null;
 }
 
 function fmtTime(s){
 s = Math.max(0, Math.round(s));
 var m = Math.floor(s/60), sec = s%60;
-return (m<10?“0”:””)+m+”:”+(sec<10?“0”:””)+sec;
+return (m<10?"0":"")+m+":"+(sec<10?"0":"")+sec;
 }
 
 var timerIntervals = {};
@@ -866,14 +862,14 @@ return audioCtx;
 function playAlarmSound(){
 var ctx = getAudioCtx();
 if (!ctx) return;
-if (ctx.state === “suspended”) ctx.resume();
+if (ctx.state === "suspended") ctx.resume();
 var now = ctx.currentTime;
 var beepTimes = [0, 0.35, 0.7, 1.05, 1.4];
 for (var i=0;i<beepTimes.length;i++){
 var t0 = now + beepTimes[i];
 var osc = ctx.createOscillator();
 var gain = ctx.createGain();
-osc.type = “square”;
+osc.type = "square";
 osc.frequency.setValueAtTime(880, t0);
 gain.gain.setValueAtTime(0, t0);
 gain.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
@@ -898,7 +894,7 @@ if (w.remaining <= 0){
 w.remaining = 0;
 stopTimerInterval(w);
 w.running = false;
-btn.textContent = “Start”;
+btn.textContent = "Start";
 if (!w.alarmPlayed){
 w.alarmPlayed = true;
 playAlarmSound();
@@ -913,32 +909,32 @@ function stopTimerInterval(w){
 if (timerIntervals[w.id]){ clearInterval(timerIntervals[w.id]); delete timerIntervals[w.id]; }
 }
 function toggleTimer(w, digits, btn){
-getAudioCtx(); // warm up audio on this user tap so the alarm isn’t blocked later
+getAudioCtx(); // warm up audio on this user tap so the alarm isn't blocked later
 if (w.running){
 stopTimerInterval(w);
 w.running = false;
-btn.textContent = “Start”;
+btn.textContent = "Start";
 } else {
 if (w.remaining <= 0) w.remaining = w.seconds;
-btn.textContent = “Pause”;
+btn.textContent = "Pause";
 startTimerInterval(w, digits, btn);
 }
 saveState();
 }
 function updateTimerVisual(w, digits, btn){
-digits.className = “timerDigits” + (w.running ? “ running” : (w.remaining<=0 ? “ done” : “”));
-btn.textContent = w.running ? “Pause” : “Start”;
+digits.className = "timerDigits" + (w.running ? " running" : (w.remaining<=0 ? " done" : ""));
+btn.textContent = w.running ? "Pause" : "Start";
 }
 
 function renderRoster(w, ul){
-ul.innerHTML = “”;
+ul.innerHTML = "";
 if (!w.roster || !w.roster.length){
-ul.innerHTML = ‘<div class="rosterEmpty">No students signed in yet.</div>’;
+ul.innerHTML = '<div class="rosterEmpty">No students signed in yet.</div>';
 return;
 }
 for (var i=0;i<w.roster.length;i++){
-var li = document.createElement(“li”);
-li.innerHTML = ‘<span class="dot"></span>’ + escapeHtml(w.roster[i]);
+var li = document.createElement("li");
+li.innerHTML = '<span class="dot"></span>' + escapeHtml(w.roster[i]);
 ul.appendChild(li);
 }
 }
@@ -946,7 +942,7 @@ ul.appendChild(li);
 /* ============================================================
 MARQUEE
 ============================================================ */
-var marqueeTrack = document.getElementById(“marqueeTrack”);
+var marqueeTrack = document.getElementById("marqueeTrack");
 function setMarqueeText(text){
 state.marquee = text;
 marqueeTrack.textContent = text;
@@ -959,14 +955,14 @@ function animateMarquee(){
 marqueePos -= 1.2;
 var w = marqueeTrack.offsetWidth;
 if (Math.abs(marqueePos) > w + 40) marqueePos = window.innerWidth;
-marqueeTrack.style.transform = “translateX(” + marqueePos + “px)”;
+marqueeTrack.style.transform = "translateX(" + marqueePos + "px)";
 requestAnimationFrame(animateMarquee);
 }
 marqueePos = window.innerWidth;
 requestAnimationFrame(animateMarquee);
 
-document.getElementById(“marqueeEditBtn”).onclick = function(){
-showPrompt(“Edit scrolling message”, state.marquee, function(val){
+document.getElementById("marqueeEditBtn").onclick = function(){
+showPrompt("Edit scrolling message", state.marquee, function(val){
 if (val !== null) setMarqueeText(val);
 }, true);
 };
@@ -975,24 +971,24 @@ if (val !== null) setMarqueeText(val);
 SIMPLE PROMPT MODAL (nicer than window.prompt)
 ============================================================ */
 function showPrompt(title, value, cb, multiline){
-var overlay = document.createElement(“div”);
-overlay.className = “modalOverlay”;
-var card = document.createElement(“div”);
-card.className = “modalCard promptCard”;
-card.innerHTML = “<h3>” + escapeHtml(title) + “</h3>”;
-var input = document.createElement(multiline ? “textarea” : “input”);
+var overlay = document.createElement("div");
+overlay.className = "modalOverlay";
+var card = document.createElement("div");
+card.className = "modalCard promptCard";
+card.innerHTML = "<h3>" + escapeHtml(title) + "</h3>";
+var input = document.createElement(multiline ? "textarea" : "input");
 if (multiline) input.rows = 3;
-input.value = value || “”;
+input.value = value || "";
 card.appendChild(input);
-var row = document.createElement(“div”);
-row.className = “promptRow”;
-row.innerHTML = ‘<button class="cancelB">Cancel</button><button class="okB">Save</button>’;
+var row = document.createElement("div");
+row.className = "promptRow";
+row.innerHTML = '<button class="cancelB">Cancel</button><button class="okB">Save</button>';
 card.appendChild(row);
 overlay.appendChild(card);
 document.body.appendChild(overlay);
 input.focus();
-row.querySelector(”.cancelB”).onclick = function(){ document.body.removeChild(overlay); cb(null); };
-row.querySelector(”.okB”).onclick = function(){ var v = input.value; document.body.removeChild(overlay); cb(v); };
+row.querySelector(".cancelB").onclick = function(){ document.body.removeChild(overlay); cb(null); };
+row.querySelector(".okB").onclick = function(){ var v = input.value; document.body.removeChild(overlay); cb(v); };
 overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(null); } };
 }
 
@@ -1000,20 +996,19 @@ overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeCh
 COG / SETTINGS MODAL
 ============================================================ */
 var AVAILABLE_NEW_WINDOWS = [
-{ type: “note”, title: “Quick Note”, soon: false },
-{ type: “poll”, title: “Live Poll”, soon: true },
-{ type: “seatchart”, title: “Seating Chart”, soon: true },
-{ type: “clock”, title: “Wall Clock”, soon: false }
+{ type: "note", title: "Quick Note", soon: false },
+{ type: "poll", title: "Live Poll", soon: true },
+{ type: "seatchart", title: "Seating Chart", soon: true },
+{ type: "clock", title: "Wall Clock", soon: false }
 ];
 
-document.getElementById(“cogBtn”).onclick = function(){
-var overlay = document.createElement(“div”);
-overlay.className = “modalOverlay”;
-var card = document.createElement(“div”);
-card.className = “modalCard”;
-card.innerHTML = “<h3>Settings</h3>”;
+document.getElementById("cogBtn").onclick = function(){
+var overlay = document.createElement("div");
+overlay.className = "modalOverlay";
+var card = document.createElement("div");
+card.className = "modalCard";
+card.innerHTML = "<h3>Settings</h3>";
 
-```
 // theme section
 var themeSec = document.createElement("div");
 themeSec.className = "modalSection";
@@ -1088,16 +1083,15 @@ card.appendChild(closeBtn);
 overlay.appendChild(card);
 document.body.appendChild(overlay);
 overlay.onclick = function(e){ if (e.target === overlay) document.body.removeChild(overlay); };
-```
 
 };
 
 function addWindow(type, title){
-var id = type + “_” + Date.now();
+var id = type + "_" + Date.now();
 Z += 1;
-var w = { id:id, type:“note”, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: 260, h: 200, z: Z, closed:false, sentAway:false, content:”” };
-if (type === “clock”){
-w.type = “clock”;
+var w = { id:id, type:"note", title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: 260, h: 200, z: Z, closed:false, sentAway:false, content:"" };
+if (type === "clock"){
+w.type = "clock";
 }
 state.windows.push(w);
 saveState();
@@ -1107,21 +1101,21 @@ renderAll();
 /* handle simple extra types generically inside buildBody via fallback */
 var origBuildBody = buildBody;
 buildBody = function(w){
-if (w.type === “note”){
-var wrap = document.createElement(“div”);
-var ta = document.createElement(“textarea”);
-ta.className = “bellworkArea”;
-ta.placeholder = “Quick note…”;
-ta.value = w.content || “”;
+if (w.type === "note"){
+var wrap = document.createElement("div");
+var ta = document.createElement("textarea");
+ta.className = "bellworkArea";
+ta.placeholder = "Quick note…";
+ta.value = w.content || "";
 ta.oninput = function(){ w.content = ta.value; saveState(); };
 wrap.appendChild(ta);
 return wrap;
 }
-if (w.type === “clock”){
-var wrap2 = document.createElement(“div”);
-wrap2.style.cssText = “height:100%;display:flex;align-items:center;justify-content:center;”;
-var d = document.createElement(“div”);
-d.style.cssText = “font-family:‘SF Mono’,Menlo,monospace;font-size:clamp(28px,10vmin,52px);font-weight:700;color:#1d3d3a;”;
+if (w.type === "clock"){
+var wrap2 = document.createElement("div");
+wrap2.style.cssText = "height:100%;display:flex;align-items:center;justify-content:center;";
+var d = document.createElement("div");
+d.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(28px,10vmin,52px);font-weight:700;color:#1d3d3a;";
 wrap2.appendChild(d);
 function tick(){ d.textContent = new Date().toLocaleTimeString(); }
 tick();
@@ -1133,11 +1127,11 @@ return origBuildBody(w);
 
 function exportSession(){
 var data = JSON.stringify(state, null, 2);
-var blob = new Blob([data], {type:“application/json”});
+var blob = new Blob([data], {type:"application/json"});
 var url = URL.createObjectURL(blob);
-var a = document.createElement(“a”);
+var a = document.createElement("a");
 var today = new Date();
-var fname = “classroom-session-” + today.getFullYear() + “-” + (today.getMonth()+1) + “-” + today.getDate() + “.json”;
+var fname = "classroom-session-" + today.getFullYear() + "-" + (today.getMonth()+1) + "-" + today.getDate() + ".json";
 a.href = url; a.download = fname;
 document.body.appendChild(a); a.click(); document.body.removeChild(a);
 URL.revokeObjectURL(url);
@@ -1147,39 +1141,39 @@ URL.revokeObjectURL(url);
 STUDENT JOIN FLOW (simulated locally via hash route)
 ============================================================ */
 function initJoinFlowIfNeeded(){
-if (location.hash !== “#join”) return;
+if (location.hash !== "#join") return;
 document.body.innerHTML =
-‘<div style="height:100%;display:flex;align-items:center;justify-content:center;background:#141b26;">’ +
-‘<div style="background:#f7f5f0;padding:24px;border-radius:14px;max-width:320px;width:90%;text-align:center;">’ +
-‘<h2 style="margin:0 0 6px;color:#24303f;">Join Class</h2>’ +
-‘<p style="color:#6b6152;font-size:13px;margin:0 0 16px;">Enter your name to sign in.</p>’ +
-‘<input id="joinName" placeholder="Your name" style="width:100%;padding:10px;border-radius:8px;border:1px solid #c9c2ac;font-size:15px;margin-bottom:10px;box-sizing:border-box;">’ +
-‘<button id="joinBtn" style="width:100%;padding:11px;border:none;border-radius:8px;background:#1f8f7d;color:#fff;font-weight:700;font-size:14px;">Join</button>’ +
-‘<p id="joinMsg" style="color:#1f8f7d;font-size:12px;margin-top:10px;"></p>’ +
-‘</div></div>’;
-document.getElementById(“joinBtn”).onclick = function(){
-var name = document.getElementById(“joinName”).value.trim();
+'<div style="height:100%;display:flex;align-items:center;justify-content:center;background:#141b26;">' +
+'<div style="background:#f7f5f0;padding:24px;border-radius:14px;max-width:320px;width:90%;text-align:center;">' +
+'<h2 style="margin:0 0 6px;color:#24303f;">Join Class</h2>' +
+'<p style="color:#6b6152;font-size:13px;margin:0 0 16px;">Enter your name to sign in.</p>' +
+'<input id="joinName" placeholder="Your name" style="width:100%;padding:10px;border-radius:8px;border:1px solid #c9c2ac;font-size:15px;margin-bottom:10px;box-sizing:border-box;">' +
+'<button id="joinBtn" style="width:100%;padding:11px;border:none;border-radius:8px;background:#1f8f7d;color:#fff;font-weight:700;font-size:14px;">Join</button>' +
+'<p id="joinMsg" style="color:#1f8f7d;font-size:12px;margin-top:10px;"></p>' +
+'</div></div>';
+document.getElementById("joinBtn").onclick = function(){
+var name = document.getElementById("joinName").value.trim();
 if (!name) return;
 var st = loadState();
 var signinWin = null;
-for (var i=0;i<st.windows.length;i++){ if (st.windows[i].type===“signin”) signinWin = st.windows[i]; }
+for (var i=0;i<st.windows.length;i++){ if (st.windows[i].type==="signin") signinWin = st.windows[i]; }
 if (signinWin){
 signinWin.roster = signinWin.roster || [];
 signinWin.roster.push(name);
 try { localStorage.setItem(STORAGE_KEY, JSON.stringify(st)); } catch(e){}
 }
-document.getElementById(“joinMsg”).textContent = “You’re signed in, “ + name + “! (Note: on separate devices this requires the PeerJS/WiFi sync layer to relay to the teacher’s screen live.)”;
+document.getElementById("joinMsg").textContent = "You're signed in, " + name + "! (Note: on separate devices this requires the PeerJS/WiFi sync layer to relay to the teacher's screen live.)";
 };
 }
 
 /* ============================================================
 INIT
 ============================================================ */
-if (location.hash === “#join”){
+if (location.hash === "#join"){
 initJoinFlowIfNeeded();
 } else {
 renderAll();
-window.addEventListener(“resize”, function(){ /* keep layout as-is; user can drag */ });
+window.addEventListener("resize", function(){ /* keep layout as-is; user can drag */ });
 }
 
 })();
