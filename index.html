@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Classroom Hub</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #141b26;
+    color: #eef1f4;
+    -webkit-user-select: none; user-select: none;
+  }
+  #desk {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+  }
+
+/* ––––– Top marquee bar ––––– */
+#topbar {
+position: absolute; top: 0; left: 0; right: 0; height: 42px;
+background: linear-gradient(180deg,#20293a,#161d29);
+border-bottom: 1px solid #2c3a4f;
+display: flex; align-items: stretch;
+z-index: 500;
+}
+#marqueeWrap {
+flex: 1; position: relative; overflow: hidden;
+display: flex; align-items: center;
+}
+#marqueeTrack {
+position: absolute; white-space: nowrap; will-change: transform;
+font-size: 15px; font-weight: 600; letter-spacing: 0.3px;
+color: #ffd98e;
+padding-left: 100%;
+}
+#marqueeEditBtn {
+width: 42px; flex-shrink: 0; border: none; background: transparent; color: #7fa8c9;
+font-size: 18px; cursor: pointer; border-left: 1px solid #2c3a4f;
+}
+#cogBtn {
+width: 42px; flex-shrink: 0; border: none; background: transparent; color: #9fb4c7;
+font-size: 19px; cursor: pointer; border-left: 1px solid #2c3a4f;
+}
+#cogBtn:active, #marqueeEditBtn:active { background: #263349; }
+
+/* ––––– Canvas where windows live ––––– */
+#canvas {
+position: absolute; top: 42px; left: 0; right: 0; bottom: 40px;
+overflow: auto;
+-webkit-overflow-scrolling: touch;
+}
+#canvasInner {
+position: relative;
+min-width: 100%; min-height: 100%;
+}
+
+/* ––––– Window ––––– */
+.win {
+position: absolute;
+background: #f7f5f0;
+color: #24303f;
+border-radius: 10px;
+box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.06);
+display: flex; flex-direction: column;
+overflow: hidden;
+min-width: 180px; min-height: 130px;
+transition: box-shadow .15s, opacity .35s, transform .35s;
+}
+.win.dragging { box-shadow: 0 18px 40px rgba(0,0,0,0.5); }
+.win.private { box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 0 0 2px #e0a640; }
+.winHead {
+height: 34px; flex-shrink: 0;
+background: #e7e2d6;
+display: flex; align-items: center;
+padding: 0 8px;
+cursor: grab;
+border-bottom: 1px solid #dcd6c6;
+}
+.winHead:active { cursor: grabbing; }
+.winTitle {
+flex: 1; font-size: 13px; font-weight: 700; color: #4a4030;
+white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+letter-spacing: 0.2px;
+}
+.winBtn {
+width: 24px; height: 24px; border: none; border-radius: 6px;
+background: transparent; color: #6b6152; font-size: 13px; cursor: pointer;
+display: flex; align-items: center; justify-content: center; margin-left: 2px;
+}
+.winBtn:active { background: rgba(0,0,0,0.08); }
+.winBtn.close:active { background: #d8564a; color: #fff; }
+.winBody { flex: 1; overflow: auto; position: relative; }
+.resizeHandle {
+position: absolute; right: 0; bottom: 0; width: 22px; height: 22px;
+cursor: nwse-resize;
+background: linear-gradient(135deg, transparent 50%, #b9b09b 50%);
+border-bottom-right-radius: 10px;
+}
+.privTag {
+position: absolute; top: 6px; right: 30px; font-size: 10px; font-weight: 800;
+color: #8a5a00; background: #ffe3ad; padding: 2px 6px; border-radius: 5px;
+letter-spacing: 0.4px; pointer-events: none;
+}
+.winHead .privTag { position: static; margin-right: 6px; }
+
+/* window sending animation */
+.win.sending {
+transform: translateX(140vw) scale(0.85);
+opacity: 0;
+}
+.win.arriving-back {
+animation: arriveBack .35s ease-out;
+}
+@keyframes arriveBack {
+from { transform: translateX(60px); opacity: 0; }
+to { transform: translateX(0); opacity: 1; }
+}
+
+/* ––––– Bellwork window content ––––– */
+.bellworkArea {
+width: 100%; height: 100%; border: none; resize: none;
+padding: 14px 16px; font-size: 16px; line-height: 1.5;
+font-family: -apple-system, sans-serif; color: #2b2318;
+background: #fffdf7;
+}
+.bellworkArea:focus { outline: none; background: #fffef9; }
+
+/* ––––– Timer ––––– */
+.timerBody {
+display: flex; flex-direction: column; align-items: center; justify-content: center;
+height: 100%; gap: 10px; padding: 10px;
+}
+.timerDigits {
+font-family: “SF Mono”, “Menlo”, monospace; font-size: 15vmin; max-font-size: 54px;
+font-size: clamp(30px, 12vmin, 60px);
+font-weight: 700; color: #1d3d3a; letter-spacing: 1px;
+}
+.timerDigits.running { color: #1f8f7d; }
+.timerDigits.done { color: #c1442e; animation: pulse 0.6s infinite alternate; }
+@keyframes pulse { from{opacity:1;} to{opacity:0.4;} }
+.timerBtnRow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.tBtn {
+border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700;
+background: #dcd6c6; color: #3a3327; cursor: pointer;
+}
+.tBtn.go { background: #1f8f7d; color: #fff; }
+.tBtn:active { filter: brightness(0.92); }
+
+/* ––––– YouTube window ––––– */
+.ytBody { height: 100%; display: flex; flex-direction: column; }
+.ytInputRow { display: flex; gap: 6px; padding: 8px; background: #efeade; border-bottom: 1px solid #dcd6c6; }
+.ytInputRow input {
+flex: 1; border: 1px solid #c9c2ac; border-radius: 6px; padding: 7px 9px; font-size: 13px;
+}
+.ytInputRow button {
+border: none; border-radius: 6px; padding: 7px 12px; background: #1f8f7d; color: #fff;
+font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.ytFrameWrap { flex: 1; background: #000; position: relative; }
+.ytFrameWrap iframe { width: 100%; height: 100%; border: none; }
+.ytPlaceholder {
+position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+color: #8a8f96; font-size: 13px; text-align: center; padding: 20px; background: #1a1f26;
+}
+
+/* ––––– Sign-in / QR window ––––– */
+.signBody { padding: 14px; height: 100%; overflow: auto; }
+.qrBox {
+width: 100%; max-width: 220px; margin: 0 auto 12px; aspect-ratio: 1/1;
+background: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+border: 1px solid #dcd6c6;
+}
+.qrBox img { width: 100%; height: 100%; border-radius: 6px; }
+.joinLine { text-align: center; font-size: 12px; color: #6b6152; margin-bottom: 10px; word-break: break-all; }
+.rosterList { list-style: none; margin: 0; padding: 0; }
+.rosterList li {
+display: flex; align-items: center; gap: 8px;
+padding: 7px 8px; border-bottom: 1px solid #ece7d9; font-size: 13px;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #1f8f7d; flex-shrink: 0; }
+.rosterEmpty { text-align: center; color: #9a9282; font-size: 12px; padding: 14px; }
+
+/* ––––– Answers window (private) ––––– */
+.ansBody { height: 100%; display: flex; flex-direction: column; }
+.ansToolbar {
+display: flex; gap: 6px; padding: 7px 8px; background: #efeade; border-bottom: 1px solid #dcd6c6;
+align-items: center;
+}
+.ansToolbar input {
+flex: 1; border: 1px solid #c9c2ac; border-radius: 6px; padding: 6px 8px; font-size: 12px;
+}
+.ansToolbar button {
+border: none; border-radius: 6px; padding: 6px 10px; background: #6b6152; color: #fff;
+font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.ansFeed { flex: 1; overflow: auto; padding: 8px; font-family: “SF Mono”, Menlo, monospace; font-size: 12px; }
+.ansItem {
+background: #fff; border: 1px solid #e2ddcf; border-radius: 7px; padding: 7px 9px; margin-bottom: 6px;
+}
+.ansItem .who { font-weight: 700; color: #1f8f7d; }
+.ansItem .txt { color: #2b2318; margin-top: 2px; }
+.ansEmpty { text-align: center; color: #9a9282; font-size: 12px; padding: 20px; }
+
+/* ––––– Dock (minimized / off-screen tabs) ––––– */
+#dock {
+position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
+background: #10161f; border-top: 1px solid #24304199;
+display: flex; align-items: center; gap: 6px; padding: 0 8px;
+overflow-x: auto; z-index: 500;
+}
+.dockChip {
+flex-shrink: 0; height: 28px; padding: 0 12px; border-radius: 14px;
+background: #223047; color: #cfe0ee; font-size: 12px; font-weight: 600;
+display: flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid #2f4160;
+}
+.dockChip.private { background: #3a3220; color: #ffd98e; border-color: #6b571f; }
+.dockChip .dot2 { width: 6px; height: 6px; border-radius: 50%; background: #3d9b8f; }
+.dockHint { font-size: 11px; color: #52627a; margin-left: auto; flex-shrink: 0; padding-right: 4px; }
+
+/* ––––– Ghost tab (sent-away preview strip) ––––– */
+#ghostRail {
+position: absolute; top: 42px; right: 0; bottom: 40px; width: 14px;
+z-index: 400; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 12px;
+pointer-events: none;
+}
+.ghostTab {
+pointer-events: auto;
+width: 14px; height: 60px; background: #e0a640; border-radius: 6px 0 0 6px;
+cursor: pointer; box-shadow: -2px 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ––––– Modal (cog settings) ––––– */
+.modalOverlay {
+position: fixed; inset: 0; background: rgba(10,14,20,0.6); z-index: 1000;
+display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modalCard {
+background: #1c2534; border: 1px solid #2f3d52; border-radius: 14px;
+width: 100%; max-width: 380px; max-height: 86vh; overflow: auto;
+padding: 18px; color: #e6ebf1;
+}
+.modalCard h3 { margin: 0 0 12px; font-size: 16px; letter-spacing: 0.2px; }
+.modalSection { margin-bottom: 18px; }
+.modalSection label { display: block; font-size: 11px; color: #8fa3ba; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+.addWinGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.addWinBtn {
+border: 1px solid #35455c; background: #242f42; color: #dce6f0; border-radius: 9px;
+padding: 10px 8px; font-size: 12px; font-weight: 600; cursor: pointer; text-align: left;
+}
+.addWinBtn:active { background: #2c3a52; }
+.addWinBtn.soon { opacity: 0.45; }
+.themeGrid { display: flex; gap: 10px; flex-wrap: wrap; }
+.themeSwatch {
+width: 42px; height: 42px; border-radius: 10px; cursor: pointer; border: 2px solid transparent;
+display: flex; align-items: flex-end; justify-content: flex-end; padding: 3px;
+}
+.themeSwatch.active { border-color: #fff; }
+.modalCloseBtn {
+width: 100%; margin-top: 4px; border: none; border-radius: 9px; padding: 11px; background: #2f3d52;
+color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.exportBtn {
+width: 100%; border: none; border-radius: 9px; padding: 11px; background: #1f8f7d;
+color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; margin-bottom: 8px;
+}
+.comingSoonNote { font-size: 11px; color: #6f83a0; margin-top: 6px; line-height: 1.4; }
+
+/* small text prompt modal for marquee edit */
+.promptCard input, .promptCard textarea {
+width: 100%; border-radius: 8px; border: 1px solid #3a4a63; background: #10161f; color: #e6ebf1;
+padding: 9px 10px; font-size: 14px; margin-bottom: 10px; font-family: inherit;
+}
+.promptRow { display: flex; gap: 8px; }
+.promptRow button {
+flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; cursor: pointer; font-size: 13px;
+}
+.promptRow .cancelB { background: #2b3648; color: #cdd7e3; }
+.promptRow .okB { background: #1f8f7d; color: #fff; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+</style>
+
+</head>
+<body>
+
+<div id="desk">
+  <div id="topbar">
+    <div id="marqueeWrap">
+      <div id="marqueeTrack">Welcome! Bellwork is on the board. &nbsp;&nbsp;&bull;&nbsp;&nbsp; Have your Chromebooks charged. &nbsp;&nbsp;&bull;&nbsp;&nbsp; Quiz Friday!</div>
+    </div>
+    <button id="marqueeEditBtn" title="Edit scrolling message">&#9998;</button>
+    <button id="cogBtn" title="Settings">&#9881;</button>
+  </div>
+
+  <div id="canvas">
+    <div id="canvasInner"></div>
+  </div>
+  <div id="ghostRail"></div>
+  <div id="dock"></div>
+</div>
+
+<script>
+(function(){
+
+  /* ============================================================
+     STATE
+  ============================================================ */
+  var STORAGE_KEY = "classroomHubState_v1";
+
+  var THEMES = {
+    slate:  { name: "Slate",  desk: "#141b26", bar1: "#20293a", bar2: "#161d29", win: "#f7f5f0", winHead: "#e7e2d6", winHeadBorder: "#dcd6c6", winText: "#4a4030", bodyBg: "#fffdf7", accent: "#1f8f7d" },
+    forest: { name: "Forest", desk: "#111d16", bar1: "#1c2e22", bar2: "#132018", win: "#f4f3ea", winHead: "#e2e6d4", winHeadBorder: "#d3d9bd", winText: "#33402c", bodyBg: "#fbfcf5", accent: "#2d9d6f" },
+    maroon: { name: "Maroon", desk: "#231318", bar1: "#331b21", bar2: "#251318", win: "#f8f2ee", winHead: "#ecdcd4", winHeadBorder: "#ddc4b8", winText: "#4a2c22", bodyBg: "#fff8f5", accent: "#c0533f" },
+    navy:   { name: "Navy",   desk: "#0d1626", bar1: "#152036", bar2: "#0e1728", win: "#f5f6f8", winHead: "#d9e0ea", winHeadBorder: "#c4cede", winText: "#20304a", bodyBg: "#fbfcfe", accent: "#3d7bd9" },
+    dusk:   { name: "Dusk",   desk: "#1c1626", bar1: "#2a2036", bar2: "#1a1522", win: "#f6f2ee", winHead: "#e5dbe8", winHeadBorder: "#d3c2d9", winText: "#3a2c42", bodyBg: "#fdfaff", accent: "#a15fd9" }
+  };
+
+  var state = null;
+  var Z = 10;
+
+  function defaultState(){
+    return {
+      theme: "slate",
+      marquee: "Welcome! Bellwork is on the board.  \u2022  Have your Chromebooks charged.  \u2022  Quiz Friday!",
+      className: "Period 3 - Earth Space Science",
+      windows: [
+        { id: "bellwork", type: "bellwork", title: "Bellwork & Lesson Plan", x: 20, y: 16, w: 480, h: 420, z: 1, closed: false, sentAway: false, content: "BELLWORK (10 min)\n1. What percent of Earth's water is fresh water?\n2. Name the 3 states of water in the water cycle.\n\nLESSON PLAN - Unit 1: Weather & Water Cycle\n- Warm up / bellwork review\n- Notes: Evaporation, Condensation, Precipitation\n- Florida rain gauge lab (grocery store cups)\n- Exit ticket" },
+        { id: "timer", type: "timer", title: "Timer", x: 520, y: 16, w: 260, h: 220, z: 2, closed: false, sentAway: false, seconds: 600, remaining: 600, running: false },
+        { id: "yt", type: "youtube", title: "Video", x: 520, y: 250, w: 340, h: 240, z: 3, closed: false, sentAway: false, url: "https://youtu.be/hJctWroL67A?is=jtcfpyl4pmnbbNya" },
+        { id: "signin", type: "signin", title: "Student Sign-In", x: 20, y: 450, w: 260, h: 260, z: 4, closed: false, sentAway: false, roster: [] },
+        { id: "answers", type: "answers", title: "Student Answers", x: 300, y: 450, w: 300, h: 260, z: 5, closed: true, sentAway: false, feed: [] }
+      ]
+    };
+  }
+
+  function loadState(){
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.windows) return parsed;
+      }
+    } catch(e){}
+    return defaultState();
+  }
+
+  function saveState(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+  }
+
+  state = loadState();
+
+  /* ============================================================
+     THEME
+  ============================================================ */
+  function applyTheme(){
+    var t = THEMES[state.theme] || THEMES.slate;
+    document.getElementById("desk").style.background = t.desk;
+    document.body.style.background = t.desk;
+    document.getElementById("canvas").style.background = t.desk;
+    document.getElementById("topbar").style.background = "linear-gradient(180deg," + t.bar1 + "," + t.bar2 + ")";
+    document.getElementById("dock").style.background = t.bar2;
+
+    var wins = document.querySelectorAll(".win");
+    for (var i=0;i<wins.length;i++){ wins[i].style.background = t.win; }
+
+    var style = document.getElementById("dynAccent");
+    if (!style){ style = document.createElement("style"); style.id = "dynAccent"; document.head.appendChild(style); }
+    style.innerHTML =
+      ".winHead{background:"+t.winHead+" !important;border-bottom-color:"+t.winHeadBorder+" !important;}" +
+      ".winTitle{color:"+t.winText+" !important;}" +
+      ".winBtn{color:"+t.winText+" !important;}" +
+      ".bellworkArea{background:"+t.bodyBg+" !important;}" +
+      ".ytInputRow, .ansToolbar{background:"+t.winHead+" !important;border-bottom-color:"+t.winHeadBorder+" !important;}" +
+      ".resizeHandle{background:linear-gradient(135deg, transparent 50%, "+t.winHeadBorder+" 50%) !important;}" +
+      ".tBtn{background:"+t.winHeadBorder+" !important;color:"+t.winText+" !important;}" +
+      ".tBtn.go{background:"+t.accent+" !important;color:#fff !important;}" +
+      ".timerDigits.running{color:"+t.accent+" !important;}" +
+      ".dot{background:"+t.accent+" !important;}" +
+      ".dot2{background:"+t.accent+" !important;}" +
+      ".ytInputRow button{background:"+t.accent+" !important;}" +
+      ".exportBtn{background:"+t.accent+" !important;}" +
+      ".rosterList li{border-bottom-color:"+t.winHeadBorder+" !important;}";
+  }
+
+  /* ============================================================
+     CANVAS / WINDOW MANAGEMENT
+  ============================================================ */
+  var canvas = document.getElementById("canvas");
+  var canvasInner = document.getElementById("canvasInner");
+  var dock = document.getElementById("dock");
+  var ghostRail = document.getElementById("ghostRail");
+
+  function getWin(id){
+    for (var i=0;i<state.windows.length;i++){ if (state.windows[i].id === id) return state.windows[i]; }
+    return null;
+  }
+
+  function bringToFront(w){
+    Z += 1; w.z = Z;
+    var el = document.getElementById("winel_"+w.id);
+    if (el) el.style.zIndex = Z;
+  }
+
+  function updateCanvasExtent(){
+    var maxRight = canvas.clientWidth;
+    var maxBottom = canvas.clientHeight;
+    for (var i=0;i<state.windows.length;i++){
+      var w = state.windows[i];
+      if (w.closed || w.sentAway) continue;
+      var right = w.x + w.w + 60;
+      var bottom = w.y + w.h + 60;
+      if (right > maxRight) maxRight = right;
+      if (bottom > maxBottom) maxBottom = bottom;
+    }
+    canvasInner.style.width = maxRight + "px";
+    canvasInner.style.height = maxBottom + "px";
+  }
+
+  function renderAll(){
+    canvasInner.innerHTML = "";
+    dock.innerHTML = "";
+    ghostRail.innerHTML = "";
+    for (var i=0;i<state.windows.length;i++){
+      renderWindow(state.windows[i]);
+    }
+    renderDockAndGhosts();
+    updateCanvasExtent();
+    applyTheme();
+  }
+
+  function renderDockAndGhosts(){
+    var anyClosed = false, anySent = false;
+    for (var i=0;i<state.windows.length;i++){
+      var w = state.windows[i];
+      if (w.closed){
+        anyClosed = true;
+        var chip = document.createElement("div");
+        chip.className = "dockChip";
+        chip.innerHTML = '<span class="dot2"></span><span>' + escapeHtml(w.title) + '</span>';
+        (function(win){ chip.onclick = function(){ win.closed = false; bringToFront(win); saveState(); renderAll(); }; })(w);
+        dock.appendChild(chip);
+      }
+      if (w.sentAway && !w.closed){
+        anySent = true;
+        var gt = document.createElement("div");
+        gt.className = "ghostTab";
+        gt.title = "Bring back: " + w.title;
+        (function(win){ gt.onclick = function(){ win.sentAway = false; bringToFront(win); saveState(); renderAll(); }; })(w);
+        ghostRail.appendChild(gt);
+
+        var chip2 = document.createElement("div");
+        chip2.className = "dockChip private";
+        chip2.innerHTML = '<span>&#128274;</span><span>' + escapeHtml(w.title) + ' (2nd screen)</span>';
+        (function(win){ chip2.onclick = function(){ win.sentAway = false; bringToFront(win); saveState(); renderAll(); }; })(w);
+        dock.appendChild(chip2);
+      }
+    }
+    var hint = document.createElement("div");
+    hint.className = "dockHint";
+    hint.textContent = (anyClosed || anySent) ? "" : "Closed & sent-away windows appear here";
+    dock.appendChild(hint);
+  }
+
+  function escapeHtml(s){
+    return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function getJoinUrl(){
+    var href = location.href;
+    var usable = /^https?:\/\//i.test(href);
+    if (usable){
+      return href.split("#")[0] + "#join";
+    }
+    // File opened locally (file://) or in a sandboxed preview: no real shareable
+    // web address exists yet, so the QR/link can't point students anywhere real
+    // until this file is hosted (e.g. GitHub Pages). Flag that clearly instead
+    // of silently producing a broken image.
+    return "NEEDS_HOSTING";
+  }
+
+  function renderWindow(w){
+    if (w.closed || w.sentAway) return;
+
+    var el = document.createElement("div");
+    el.className = "win" + (w.privateFlag ? " private" : "");
+    el.id = "winel_" + w.id;
+    el.style.left = w.x + "px";
+    el.style.top = w.y + "px";
+    el.style.width = w.w + "px";
+    el.style.height = w.h + "px";
+    el.style.zIndex = w.z || 1;
+
+    var head = document.createElement("div");
+    head.className = "winHead";
+    var isPrivateType = (w.type === "answers");
+    head.innerHTML =
+      (isPrivateType ? '<span class="privTag">TEACHER ONLY</span>' : '') +
+      '<div class="winTitle">' + escapeHtml(w.title) + '</div>' +
+      '<button class="winBtn popout" title="Pop out to another window">&#8663;</button>' +
+      '<button class="winBtn sendAway" title="Send to other screen">&#8674;</button>' +
+      '<button class="winBtn close" title="Close">&#10005;</button>';
+    el.appendChild(head);
+
+    var body = document.createElement("div");
+    body.className = "winBody";
+    body.appendChild(buildBody(w));
+    el.appendChild(body);
+
+    var rh = document.createElement("div");
+    rh.className = "resizeHandle";
+    el.appendChild(rh);
+
+    canvasInner.appendChild(el);
+
+    // interactions
+    head.querySelector(".close").onclick = function(){ w.closed = true; saveState(); renderAll(); };
+    head.querySelector(".sendAway").onclick = function(){ sendAwayAnim(el, w); };
+    head.querySelector(".popout").onclick = function(){ popOutWindow(w); };
+
+    el.addEventListener("mousedown", function(){ bringToFront(w); saveState(); });
+    makeDraggable(el, head, w);
+    makeResizable(el, rh, w);
+  }
+
+  function sendAwayAnim(el, w){
+    el.classList.add("sending");
+    setTimeout(function(){
+      w.sentAway = true;
+      saveState();
+      renderAll();
+    }, 320);
+  }
+
+  /* ---------- Drag ---------- */
+  function makeDraggable(el, handle, w){
+    var startX, startY, origX, origY, dragging=false;
+
+    function pointerDown(e){
+      if (e.target.tagName === "BUTTON") return;
+      dragging = true;
+      el.classList.add("dragging");
+      var p = getPoint(e);
+      startX = p.x; startY = p.y;
+      origX = w.x; origY = w.y;
+      bringToFront(w);
+      e.preventDefault();
+    }
+    function pointerMove(e){
+      if (!dragging) return;
+      var p = getPoint(e);
+      var dx = p.x - startX, dy = p.y - startY;
+      w.x = Math.max(0, origX + dx);
+      w.y = Math.max(0, origY + dy);
+      el.style.left = w.x + "px";
+      el.style.top = w.y + "px";
+      updateCanvasExtent();
+    }
+    function pointerUp(){
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove("dragging");
+      saveState();
+      updateCanvasExtent();
+    }
+    function getPoint(e){
+      if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    handle.addEventListener("mousedown", pointerDown);
+    handle.addEventListener("touchstart", pointerDown, {passive:false});
+    document.addEventListener("mousemove", pointerMove);
+    document.addEventListener("touchmove", pointerMove, {passive:false});
+    document.addEventListener("mouseup", pointerUp);
+    document.addEventListener("touchend", pointerUp);
+  }
+
+  /* ---------- Resize ---------- */
+  function makeResizable(el, handle, w){
+    var startX, startY, origW, origH, resizing=false;
+    function pointerDown(e){
+      resizing = true;
+      var p = getPoint(e);
+      startX = p.x; startY = p.y;
+      origW = w.w; origH = w.h;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    function pointerMove(e){
+      if (!resizing) return;
+      var p = getPoint(e);
+      var dx = p.x - startX, dy = p.y - startY;
+      w.w = Math.max(180, origW + dx);
+      w.h = Math.max(130, origH + dy);
+      el.style.width = w.w + "px";
+      el.style.height = w.h + "px";
+      updateCanvasExtent();
+    }
+    function pointerUp(){
+      if (!resizing) return;
+      resizing = false;
+      saveState();
+      updateCanvasExtent();
+    }
+    function getPoint(e){
+      if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      return { x: e.clientX, y: e.clientY };
+    }
+    handle.addEventListener("mousedown", pointerDown);
+    handle.addEventListener("touchstart", pointerDown, {passive:false});
+    document.addEventListener("mousemove", pointerMove);
+    document.addEventListener("touchmove", pointerMove, {passive:false});
+    document.addEventListener("mouseup", pointerUp);
+    document.addEventListener("touchend", pointerUp);
+  }
+
+  /* ---------- Pop out to real separate window ---------- */
+  function popOutWindow(w){
+    var popup = window.open("", "popout_"+w.id, "width="+Math.max(w.w,320)+",height="+Math.max(w.h,240)+",menubar=no,toolbar=no,location=no,status=no");
+    if (!popup){
+      alert("Pop-up blocked. Please allow pop-ups for this page to use the second-screen window.");
+      return;
+    }
+    var themeObj = THEMES[state.theme] || THEMES.slate;
+    popup.document.write(
+      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>" + escapeHtml(w.title) + "</title>" +
+      "<style>body{margin:0;background:"+themeObj.win+";font-family:-apple-system,sans-serif;color:#24303f;} " +
+      ".hdr{background:#e7e2d6;padding:10px 14px;font-weight:700;font-size:14px;border-bottom:1px solid #dcd6c6;} " +
+      ".content{padding:16px;font-size:15px;line-height:1.5;white-space:pre-wrap;}" +
+      "textarea{width:100%;height:80vh;border:none;padding:14px;font-size:16px;font-family:inherit;box-sizing:border-box;}</style></head><body>" +
+
+```
+  "<div class='hdr'>" + escapeHtml(w.title) + " &mdash; drag this window to your second monitor</div>" +
+  "<div class='content' id='c'></div>" +
+  "</body></html>"
+);
+popup.document.close();
+
+var target = popup.document.getElementById("c");
+if (w.type === "bellwork"){
+  var ta = popup.document.createElement("textarea");
+  ta.value = w.content || "";
+  ta.oninput = function(){ w.content = ta.value; saveState(); };
+  target.appendChild(ta);
+} else if (w.type === "answers"){
+  var refresh = function(){
+    target.innerHTML = "";
+    if (!w.feed || !w.feed.length){
+      target.innerHTML = "<div style='color:#9a9282;'>No answers submitted yet.</div>";
+      return;
+    }
+    for (var i=w.feed.length-1;i>=0;i--){
+      var it = w.feed[i];
+      var d = popup.document.createElement("div");
+      d.style.cssText = "background:#fff;border:1px solid #e2ddcf;border-radius:8px;padding:8px 10px;margin-bottom:8px;";
+      d.innerHTML = "<b style='color:#1f8f7d;'>" + escapeHtml(it.name) + "</b><div>" + escapeHtml(it.text) + "</div>";
+      target.appendChild(d);
+    }
+  };
+  refresh();
+  var iv = setInterval(function(){
+    if (popup.closed){ clearInterval(iv); return; }
+    refresh();
+  }, 1500);
+} else {
+  target.textContent = "Live view of \"" + w.title + "\" — this content type doesn't pop out with full interactivity yet, but you can keep it visible here for your second screen.";
+}
+```
+
+}
+
+/* ============================================================
+BUILD WINDOW BODIES BY TYPE
+============================================================ */
+function buildBody(w){
+var wrap = document.createElement(“div”);
+wrap.style.height = “100%”;
+
+```
+if (w.type === "bellwork"){
+  var ta = document.createElement("textarea");
+  ta.className = "bellworkArea";
+  ta.value = w.content || "";
+  ta.placeholder = "Type today's bellwork and lesson plan here...";
+  ta.oninput = function(){ w.content = ta.value; saveState(); };
+  wrap.appendChild(ta);
+}
+
+else if (w.type === "timer"){
+  var body = document.createElement("div");
+  body.className = "timerBody";
+  var digits = document.createElement("div");
+  digits.className = "timerDigits";
+  digits.textContent = fmtTime(w.remaining);
+  var row1 = document.createElement("div");
+  row1.className = "timerBtnRow";
+  row1.innerHTML =
+    '<button class="tBtn" data-m="-1">-1m</button>' +
+    '<button class="tBtn" data-m="1">+1m</button>' +
+    '<button class="tBtn" data-m="5">+5m</button>';
+  var row2 = document.createElement("div");
+  row2.className = "timerBtnRow";
+  row2.innerHTML =
+    '<button class="tBtn go" data-act="startpause">Start</button>' +
+    '<button class="tBtn" data-act="reset">Reset</button>';
+  body.appendChild(digits); body.appendChild(row1); body.appendChild(row2);
+  wrap.appendChild(body);
+
+  row1.querySelectorAll("button").forEach ? null : null;
+  var btns1 = row1.getElementsByTagName("button");
+  for (var i=0;i<btns1.length;i++){
+    btns1[i].onclick = (function(btn){
+      return function(){
+        var m = parseInt(btn.getAttribute("data-m"),10);
+        w.seconds = Math.max(0, w.seconds + m*60);
+        if (!w.running) w.remaining = w.seconds;
+        digits.textContent = fmtTime(w.remaining);
+        saveState();
+      };
+    })(btns1[i]);
+  }
+  var btns2 = row2.getElementsByTagName("button");
+  btns2[0].onclick = function(){
+    toggleTimer(w, digits, btns2[0]);
+  };
+  btns2[1].onclick = function(){
+    stopTimerInterval(w);
+    w.running = false;
+    w.remaining = w.seconds;
+    w.alarmPlayed = false;
+    digits.textContent = fmtTime(w.remaining);
+    digits.className = "timerDigits";
+    btns2[0].textContent = "Start";
+    saveState();
+  };
+  updateTimerVisual(w, digits, btns2[0]);
+  if (w.running) startTimerInterval(w, digits, btns2[0]);
+}
+
+else if (w.type === "youtube"){
+  var body2 = document.createElement("div");
+  body2.className = "ytBody";
+  var row = document.createElement("div");
+  row.className = "ytInputRow";
+  row.innerHTML = '<input type="text" placeholder="Paste YouTube link..." value="' + escapeHtml(w.url||"") + '"><button>Load</button>';
+  var frameWrap = document.createElement("div");
+  frameWrap.className = "ytFrameWrap";
+  body2.appendChild(row); body2.appendChild(frameWrap);
+  wrap.appendChild(body2);
+
+  function renderVideo(){
+    frameWrap.innerHTML = "";
+    var id = extractYouTubeId(w.url);
+    if (id){
+      var ifr = document.createElement("iframe");
+      ifr.src = "https://www.youtube.com/embed/" + id;
+      ifr.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+      ifr.allowFullscreen = true;
+      frameWrap.appendChild(ifr);
+    } else {
+      var ph = document.createElement("div");
+      ph.className = "ytPlaceholder";
+      ph.textContent = "Paste a YouTube link above and tap Load.";
+      frameWrap.appendChild(ph);
+    }
+  }
+  var input = row.querySelector("input");
+  var btn = row.querySelector("button");
+  btn.onclick = function(){ w.url = input.value.trim(); saveState(); renderVideo(); };
+  input.onkeydown = function(e){ if (e.key === "Enter"){ btn.onclick(); } };
+  renderVideo();
+}
+
+else if (w.type === "signin"){
+  var body3 = document.createElement("div");
+  body3.className = "signBody";
+  var joinUrl = getJoinUrl();
+
+  if (joinUrl === "NEEDS_HOSTING"){
+    body3.innerHTML =
+      '<div class="qrBox" style="display:flex;align-items:center;justify-content:center;padding:14px;">' +
+      '<div style="font-size:12px;color:#7a6a3a;text-align:center;line-height:1.4;">No QR yet &mdash; this page needs a real web address first. Upload it to GitHub Pages (or any host), then reopen it from that link and the QR code will appear here automatically.</div>' +
+      '</div>' +
+      '<div class="joinLine">Once hosted, students scan the code to join.</div>' +
+      '<ul class="rosterList" id="rosterList_'+w.id+'"></ul>';
+  } else {
+    var qrSrc = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(joinUrl);
+    body3.innerHTML =
+      '<div class="qrBox"><img src="' + qrSrc + '" alt="QR code to join" onerror="this.parentNode.innerHTML=\'<div style=&quot;font-size:11px;color:#a33;padding:10px;text-align:center;&quot;>QR image could not load. Check your internet connection, or share the link below directly.</div>\'"></div>' +
+      '<div class="joinLine">Students scan to join &mdash; or open this link:<br><b>' + escapeHtml(joinUrl) + '</b></div>' +
+      '<ul class="rosterList" id="rosterList_'+w.id+'"></ul>';
+  }
+  wrap.appendChild(body3);
+  renderRoster(w, body3.querySelector(".rosterList"));
+}
+
+else if (w.type === "answers"){
+  var body4 = document.createElement("div");
+  body4.className = "ansBody";
+  body4.innerHTML =
+    '<div class="ansToolbar"><input placeholder="Simulate: student name" class="simName"><input placeholder="answer text" class="simText"><button>Add</button></div>' +
+    '<div class="ansFeed"></div>';
+  wrap.appendChild(body4);
+  var feedEl = body4.querySelector(".ansFeed");
+  function refreshFeed(){
+    feedEl.innerHTML = "";
+    if (!w.feed || !w.feed.length){
+      feedEl.innerHTML = '<div class="ansEmpty">No answers yet. (Local WiFi sync via PeerJS — coming online here once a session is started.)</div>';
+      return;
+    }
+    for (var i=w.feed.length-1;i>=0;i--){
+      var it = w.feed[i];
+      var d = document.createElement("div");
+      d.className = "ansItem";
+      d.innerHTML = '<div class="who">' + escapeHtml(it.name) + '</div><div class="txt">' + escapeHtml(it.text) + '</div>';
+      feedEl.appendChild(d);
+    }
+  }
+  refreshFeed();
+  var nameI = body4.querySelector(".simName");
+  var textI = body4.querySelector(".simText");
+  body4.querySelector(".ansToolbar button").onclick = function(){
+    if (!textI.value.trim()) return;
+    w.feed = w.feed || [];
+    w.feed.push({ name: nameI.value.trim() || "Student", text: textI.value.trim(), t: Date.now() });
+    nameI.value = ""; textI.value = "";
+    saveState();
+    refreshFeed();
+  };
+}
+
+return wrap;
+```
+
+}
+
+function extractYouTubeId(url){
+if (!url) return null;
+var m = url.match(/(?:youtu.be/|youtube.com/(?:watch?v=|embed/|shorts/))([A-Za-z0-9_-]{6,})/);
+return m ? m[1] : null;
+}
+
+function fmtTime(s){
+s = Math.max(0, Math.round(s));
+var m = Math.floor(s/60), sec = s%60;
+return (m<10?“0”:””)+m+”:”+(sec<10?“0”:””)+sec;
+}
+
+var timerIntervals = {};
+
+var audioCtx = null;
+function getAudioCtx(){
+if (!audioCtx){
+var AC = window.AudioContext || window.webkitAudioContext;
+if (AC) audioCtx = new AC();
+}
+return audioCtx;
+}
+function playAlarmSound(){
+var ctx = getAudioCtx();
+if (!ctx) return;
+if (ctx.state === “suspended”) ctx.resume();
+var now = ctx.currentTime;
+var beepTimes = [0, 0.35, 0.7, 1.05, 1.4];
+for (var i=0;i<beepTimes.length;i++){
+var t0 = now + beepTimes[i];
+var osc = ctx.createOscillator();
+var gain = ctx.createGain();
+osc.type = “square”;
+osc.frequency.setValueAtTime(880, t0);
+gain.gain.setValueAtTime(0, t0);
+gain.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
+gain.gain.linearRampToValueAtTime(0, t0 + 0.22);
+osc.connect(gain);
+gain.connect(ctx.destination);
+osc.start(t0);
+osc.stop(t0 + 0.25);
+}
+}
+
+function startTimerInterval(w, digits, btn){
+stopTimerInterval(w);
+w.running = true;
+w.alarmPlayed = false;
+var last = Date.now();
+timerIntervals[w.id] = setInterval(function(){
+var now = Date.now();
+var dt = (now-last)/1000; last = now;
+w.remaining -= dt;
+if (w.remaining <= 0){
+w.remaining = 0;
+stopTimerInterval(w);
+w.running = false;
+btn.textContent = “Start”;
+if (!w.alarmPlayed){
+w.alarmPlayed = true;
+playAlarmSound();
+}
+}
+digits.textContent = fmtTime(w.remaining);
+updateTimerVisual(w, digits, btn);
+saveState();
+}, 250);
+}
+function stopTimerInterval(w){
+if (timerIntervals[w.id]){ clearInterval(timerIntervals[w.id]); delete timerIntervals[w.id]; }
+}
+function toggleTimer(w, digits, btn){
+getAudioCtx(); // warm up audio on this user tap so the alarm isn’t blocked later
+if (w.running){
+stopTimerInterval(w);
+w.running = false;
+btn.textContent = “Start”;
+} else {
+if (w.remaining <= 0) w.remaining = w.seconds;
+btn.textContent = “Pause”;
+startTimerInterval(w, digits, btn);
+}
+saveState();
+}
+function updateTimerVisual(w, digits, btn){
+digits.className = “timerDigits” + (w.running ? “ running” : (w.remaining<=0 ? “ done” : “”));
+btn.textContent = w.running ? “Pause” : “Start”;
+}
+
+function renderRoster(w, ul){
+ul.innerHTML = “”;
+if (!w.roster || !w.roster.length){
+ul.innerHTML = ‘<div class="rosterEmpty">No students signed in yet.</div>’;
+return;
+}
+for (var i=0;i<w.roster.length;i++){
+var li = document.createElement(“li”);
+li.innerHTML = ‘<span class="dot"></span>’ + escapeHtml(w.roster[i]);
+ul.appendChild(li);
+}
+}
+
+/* ============================================================
+MARQUEE
+============================================================ */
+var marqueeTrack = document.getElementById(“marqueeTrack”);
+function setMarqueeText(text){
+state.marquee = text;
+marqueeTrack.textContent = text;
+saveState();
+}
+setMarqueeText(state.marquee);
+
+var marqueePos = 0;
+function animateMarquee(){
+marqueePos -= 1.2;
+var w = marqueeTrack.offsetWidth;
+if (Math.abs(marqueePos) > w + 40) marqueePos = window.innerWidth;
+marqueeTrack.style.transform = “translateX(” + marqueePos + “px)”;
+requestAnimationFrame(animateMarquee);
+}
+marqueePos = window.innerWidth;
+requestAnimationFrame(animateMarquee);
+
+document.getElementById(“marqueeEditBtn”).onclick = function(){
+showPrompt(“Edit scrolling message”, state.marquee, function(val){
+if (val !== null) setMarqueeText(val);
+}, true);
+};
+
+/* ============================================================
+SIMPLE PROMPT MODAL (nicer than window.prompt)
+============================================================ */
+function showPrompt(title, value, cb, multiline){
+var overlay = document.createElement(“div”);
+overlay.className = “modalOverlay”;
+var card = document.createElement(“div”);
+card.className = “modalCard promptCard”;
+card.innerHTML = “<h3>” + escapeHtml(title) + “</h3>”;
+var input = document.createElement(multiline ? “textarea” : “input”);
+if (multiline) input.rows = 3;
+input.value = value || “”;
+card.appendChild(input);
+var row = document.createElement(“div”);
+row.className = “promptRow”;
+row.innerHTML = ‘<button class="cancelB">Cancel</button><button class="okB">Save</button>’;
+card.appendChild(row);
+overlay.appendChild(card);
+document.body.appendChild(overlay);
+input.focus();
+row.querySelector(”.cancelB”).onclick = function(){ document.body.removeChild(overlay); cb(null); };
+row.querySelector(”.okB”).onclick = function(){ var v = input.value; document.body.removeChild(overlay); cb(v); };
+overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(null); } };
+}
+
+/* ============================================================
+COG / SETTINGS MODAL
+============================================================ */
+var AVAILABLE_NEW_WINDOWS = [
+{ type: “note”, title: “Quick Note”, soon: false },
+{ type: “poll”, title: “Live Poll”, soon: true },
+{ type: “seatchart”, title: “Seating Chart”, soon: true },
+{ type: “clock”, title: “Wall Clock”, soon: false }
+];
+
+document.getElementById(“cogBtn”).onclick = function(){
+var overlay = document.createElement(“div”);
+overlay.className = “modalOverlay”;
+var card = document.createElement(“div”);
+card.className = “modalCard”;
+card.innerHTML = “<h3>Settings</h3>”;
+
+```
+// theme section
+var themeSec = document.createElement("div");
+themeSec.className = "modalSection";
+themeSec.innerHTML = "<label>Color scheme</label>";
+var themeGrid = document.createElement("div");
+themeGrid.className = "themeGrid";
+for (var key in THEMES){
+  (function(key){
+    var t = THEMES[key];
+    var sw = document.createElement("div");
+    sw.className = "themeSwatch" + (state.theme===key ? " active" : "");
+    sw.style.background = t.desk;
+    sw.title = t.name;
+    sw.innerHTML = '<div style="width:10px;height:10px;border-radius:3px;background:'+t.accent+';"></div>';
+    sw.onclick = function(){
+      state.theme = key;
+      saveState();
+      applyTheme();
+      var all = themeGrid.querySelectorAll(".themeSwatch");
+      for (var i=0;i<all.length;i++) all[i].classList.remove("active");
+      sw.classList.add("active");
+    };
+    themeGrid.appendChild(sw);
+  })(key);
+}
+themeSec.appendChild(themeGrid);
+card.appendChild(themeSec);
+
+// add window section
+var addSec = document.createElement("div");
+addSec.className = "modalSection";
+addSec.innerHTML = "<label>Add a window</label>";
+var grid = document.createElement("div");
+grid.className = "addWinGrid";
+for (var i=0;i<AVAILABLE_NEW_WINDOWS.length;i++){
+  (function(def){
+    var b = document.createElement("button");
+    b.className = "addWinBtn" + (def.soon ? " soon" : "");
+    b.textContent = def.title + (def.soon ? " (soon)" : "");
+    b.disabled = !!def.soon;
+    b.onclick = function(){
+      addWindow(def.type, def.title);
+      document.body.removeChild(overlay);
+    };
+    grid.appendChild(b);
+  })(AVAILABLE_NEW_WINDOWS[i]);
+}
+addSec.appendChild(grid);
+card.appendChild(addSec);
+
+// export section
+var expSec = document.createElement("div");
+expSec.className = "modalSection";
+expSec.innerHTML = "<label>Class data</label>";
+var expBtn = document.createElement("button");
+expBtn.className = "exportBtn";
+expBtn.textContent = "Export this session (.json)";
+expBtn.onclick = exportSession;
+expSec.appendChild(expBtn);
+var note = document.createElement("div");
+note.className = "comingSoonNote";
+note.textContent = "Coming soon: automatically file each export into a running yearly calendar so next year's version of this class loads its own history.";
+expSec.appendChild(note);
+card.appendChild(expSec);
+
+var closeBtn = document.createElement("button");
+closeBtn.className = "modalCloseBtn";
+closeBtn.textContent = "Done";
+closeBtn.onclick = function(){ document.body.removeChild(overlay); };
+card.appendChild(closeBtn);
+
+overlay.appendChild(card);
+document.body.appendChild(overlay);
+overlay.onclick = function(e){ if (e.target === overlay) document.body.removeChild(overlay); };
+```
+
+};
+
+function addWindow(type, title){
+var id = type + “_” + Date.now();
+Z += 1;
+var w = { id:id, type:“note”, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: 260, h: 200, z: Z, closed:false, sentAway:false, content:”” };
+if (type === “clock”){
+w.type = “clock”;
+}
+state.windows.push(w);
+saveState();
+renderAll();
+}
+
+/* handle simple extra types generically inside buildBody via fallback */
+var origBuildBody = buildBody;
+buildBody = function(w){
+if (w.type === “note”){
+var wrap = document.createElement(“div”);
+var ta = document.createElement(“textarea”);
+ta.className = “bellworkArea”;
+ta.placeholder = “Quick note…”;
+ta.value = w.content || “”;
+ta.oninput = function(){ w.content = ta.value; saveState(); };
+wrap.appendChild(ta);
+return wrap;
+}
+if (w.type === “clock”){
+var wrap2 = document.createElement(“div”);
+wrap2.style.cssText = “height:100%;display:flex;align-items:center;justify-content:center;”;
+var d = document.createElement(“div”);
+d.style.cssText = “font-family:‘SF Mono’,Menlo,monospace;font-size:clamp(28px,10vmin,52px);font-weight:700;color:#1d3d3a;”;
+wrap2.appendChild(d);
+function tick(){ d.textContent = new Date().toLocaleTimeString(); }
+tick();
+setInterval(tick, 1000);
+return wrap2;
+}
+return origBuildBody(w);
+};
+
+function exportSession(){
+var data = JSON.stringify(state, null, 2);
+var blob = new Blob([data], {type:“application/json”});
+var url = URL.createObjectURL(blob);
+var a = document.createElement(“a”);
+var today = new Date();
+var fname = “classroom-session-” + today.getFullYear() + “-” + (today.getMonth()+1) + “-” + today.getDate() + “.json”;
+a.href = url; a.download = fname;
+document.body.appendChild(a); a.click(); document.body.removeChild(a);
+URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+STUDENT JOIN FLOW (simulated locally via hash route)
+============================================================ */
+function initJoinFlowIfNeeded(){
+if (location.hash !== “#join”) return;
+document.body.innerHTML =
+‘<div style="height:100%;display:flex;align-items:center;justify-content:center;background:#141b26;">’ +
+‘<div style="background:#f7f5f0;padding:24px;border-radius:14px;max-width:320px;width:90%;text-align:center;">’ +
+‘<h2 style="margin:0 0 6px;color:#24303f;">Join Class</h2>’ +
+‘<p style="color:#6b6152;font-size:13px;margin:0 0 16px;">Enter your name to sign in.</p>’ +
+‘<input id="joinName" placeholder="Your name" style="width:100%;padding:10px;border-radius:8px;border:1px solid #c9c2ac;font-size:15px;margin-bottom:10px;box-sizing:border-box;">’ +
+‘<button id="joinBtn" style="width:100%;padding:11px;border:none;border-radius:8px;background:#1f8f7d;color:#fff;font-weight:700;font-size:14px;">Join</button>’ +
+‘<p id="joinMsg" style="color:#1f8f7d;font-size:12px;margin-top:10px;"></p>’ +
+‘</div></div>’;
+document.getElementById(“joinBtn”).onclick = function(){
+var name = document.getElementById(“joinName”).value.trim();
+if (!name) return;
+var st = loadState();
+var signinWin = null;
+for (var i=0;i<st.windows.length;i++){ if (st.windows[i].type===“signin”) signinWin = st.windows[i]; }
+if (signinWin){
+signinWin.roster = signinWin.roster || [];
+signinWin.roster.push(name);
+try { localStorage.setItem(STORAGE_KEY, JSON.stringify(st)); } catch(e){}
+}
+document.getElementById(“joinMsg”).textContent = “You’re signed in, “ + name + “! (Note: on separate devices this requires the PeerJS/WiFi sync layer to relay to the teacher’s screen live.)”;
+};
+}
+
+/* ============================================================
+INIT
+============================================================ */
+if (location.hash === “#join”){
+initJoinFlowIfNeeded();
+} else {
+renderAll();
+window.addEventListener(“resize”, function(){ /* keep layout as-is; user can drag */ });
+}
+
+})();
+</script>
+
+</body>
+</html>
