@@ -150,6 +150,10 @@ background: #dcd6c6; color: #3a3327; cursor: pointer;
 }
 .tBtn.go { background: #1f8f7d; color: #fff; }
 .tBtn:active { filter: brightness(0.92); }
+.timeSetRow { display: flex; gap: 6px; align-items: center; }
+.timeSetRow input {
+width: 70px; border: 1px solid #c9c2ac; border-radius: 6px; padding: 6px 8px; font-size: 13px; text-align: center;
+}
 
 /* ––––– YouTube window ––––– */
 .ytBody { height: 100%; display: flex; flex-direction: column; }
@@ -270,6 +274,30 @@ color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; margin-bottom: 
 }
 .comingSoonNote { font-size: 11px; color: #6f83a0; margin-top: 6px; line-height: 1.4; }
 
+.modalSelect {
+width: 100%; border: 1px solid #35455c; background: #242f42; color: #dce6f0; border-radius: 8px;
+padding: 9px 8px; font-size: 13px; margin-bottom: 8px; font-family: inherit;
+}
+.inlineRow { display: flex; gap: 8px; align-items: flex-start; }
+.inlineRow .modalSelect { flex: 1; }
+.smallBtn {
+border: 1px solid #35455c; background: #242f42; color: #dce6f0; border-radius: 8px;
+padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.smallBtn:active { background: #2c3a52; }
+.calBtn {
+width: 100%; border: 1px solid #35455c; background: #20304a; color: #dce6f0; border-radius: 9px;
+padding: 11px; font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; margin-bottom: 8px;
+}
+.calBtn:active { background: #28405e; }
+.lessonChipRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.lessonChip {
+font-size: 11px; padding: 6px 10px; border-radius: 12px; background: #223047; color: #cfe0ee;
+cursor: pointer; border: 1px solid #2f4160;
+}
+.lessonChip:active { background: #2c3a52; }
+.lessonEmpty { font-size: 11px; color: #6f83a0; }
+
 /* small text prompt modal for marquee edit */
 .promptCard input, .promptCard textarea {
 width: 100%; border-radius: 8px; border: 1px solid #3a4a63; background: #10161f; color: #e6ebf1;
@@ -324,11 +352,53 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
   var state = null;
   var Z = 10;
 
+  /* Florida NGSSS high school Earth/Space Science benchmarks (source: CPALMS.org) */
+  function defaultStandardsSets(){
+    return {
+      fl_ess: {
+        name: "Florida HS Earth & Space Science (NGSSS)",
+        builtin: true,
+        standards: [
+          { code: "SC.912.E.5.1", text: "Cite evidence used to develop and verify the scientific theory of the Big Bang (also known as the Big Bang Theory) of the origin of the universe." },
+          { code: "SC.912.E.5.2", text: "Identify patterns in the organization and distribution of matter in the universe and the forces that determine them." },
+          { code: "SC.912.E.5.3", text: "Describe and predict how the initial mass of a star determines its evolution." },
+          { code: "SC.912.E.5.4", text: "Explain the physical properties of the Sun and its dynamic nature and connect them to conditions and events on Earth." },
+          { code: "SC.912.E.5.5", text: "Explain the formation of planetary systems based on our knowledge of our Solar System and apply this knowledge to newly discovered planetary systems." },
+          { code: "SC.912.E.5.6", text: "Develop logical connections through physical principles, including Kepler's and Newton's Laws, about the relationships and effects of Earth, Moon, and Sun on each other." },
+          { code: "SC.912.E.5.7", text: "Relate the history of and explain the justification for future space exploration and continuing technology development." },
+          { code: "SC.912.E.5.8", text: "Connect the concepts of radiation and the electromagnetic spectrum to the use of historical and newly-developed observational tools." },
+          { code: "SC.912.E.5.9", text: "Analyze the broad effects of space exploration on the economy and culture of Florida." },
+          { code: "SC.912.E.5.10", text: "Describe and apply the coordinate system used to locate objects in the sky." },
+          { code: "SC.912.E.6.1", text: "Describe and differentiate the layers of Earth and the interactions among them." },
+          { code: "SC.912.E.6.2", text: "Connect surface features to surface processes that are responsible for their formation." },
+          { code: "SC.912.E.6.3", text: "Analyze the scientific theory of plate tectonics and identify related major processes and features as a result of moving plates." },
+          { code: "SC.912.E.6.4", text: "Analyze how specific geologic processes and features are expressed in Florida and elsewhere." },
+          { code: "SC.912.E.6.5", text: "Describe the geologic development of the present day oceans and identify commonly found features." },
+          { code: "SC.912.E.6.6", text: "Analyze past, present, and potential future consequences to the environment resulting from various energy production technologies." },
+          { code: "SC.912.E.7.1", text: "Analyze the movement of matter and energy through the different biogeochemical cycles, including water and carbon." },
+          { code: "SC.912.E.7.2", text: "Analyze the causes of the various kinds of surface and deep water motion within the oceans and their impacts on the transfer of energy between the poles and the equator." },
+          { code: "SC.912.E.7.3", text: "Differentiate and describe the various interactions among Earth systems, including atmosphere, hydrosphere, cryosphere, geosphere, and biosphere." },
+          { code: "SC.912.E.7.4", text: "Summarize the conditions that contribute to the climate of a geographic area, including the relationships to lakes and oceans." },
+          { code: "SC.912.E.7.5", text: "Predict future weather conditions based on present observations and conceptual models and recognize limitations and uncertainties of such predictions." },
+          { code: "SC.912.E.7.6", text: "Relate the formation of severe weather to the various physical factors." },
+          { code: "SC.912.E.7.7", text: "Identify, analyze, and relate the internal (Earth system) and external (astronomical) conditions that contribute to global climate change." },
+          { code: "SC.912.E.7.8", text: "Explain how various atmospheric, oceanic, and hydrologic conditions in Florida have influenced and can influence human behavior, both individually and collectively." },
+          { code: "SC.912.E.7.9", text: "Cite evidence that the ocean has had a significant influence on climate change by absorbing, storing, and moving heat, carbon, and water." }
+        ]
+      }
+    };
+  }
+
   function defaultState(){
     return {
       theme: "slate",
       marquee: "Welcome! Bellwork is on the board.  \u2022  Have your Chromebooks charged.  \u2022  Quiz Friday!",
       className: "Period 3 - Earth Space Science",
+      currentClassId: "class1",
+      classes: [
+        { id: "class1", name: "Period 3 - Earth Space Science", standardsSetId: "fl_ess", lessons: {} }
+      ],
+      standardsSets: defaultStandardsSets(),
       windows: [
         { id: "bellwork", type: "bellwork", title: "Bellwork & Lesson Plan", x: 20, y: 16, w: 480, h: 420, z: 1, closed: false, sentAway: false, content: "BELLWORK (10 min)\n1. What percent of Earth's water is fresh water?\n2. Name the 3 states of water in the water cycle.\n\nLESSON PLAN - Unit 1: Weather & Water Cycle\n- Warm up / bellwork review\n- Notes: Evaporation, Condensation, Precipitation\n- Florida rain gauge lab (grocery store cups)\n- Exit ticket" },
         { id: "timer", type: "timer", title: "Timer", x: 520, y: 16, w: 260, h: 220, z: 2, closed: false, sentAway: false, seconds: 600, remaining: 600, running: false },
@@ -339,12 +409,29 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     };
   }
 
+  function migrateState(s){
+    if (!s.standardsSets) s.standardsSets = defaultStandardsSets();
+    if (!s.classes || !s.classes.length){
+      s.classes = [{ id: "class1", name: s.className || "My Class", standardsSetId: "fl_ess", lessons: {} }];
+    }
+    for (var i=0;i<s.classes.length;i++){
+      if (!s.classes[i].lessons) s.classes[i].lessons = {};
+    }
+    if (!s.currentClassId) s.currentClassId = s.classes[0].id;
+    return s;
+  }
+
+  function getCurrentClass(){
+    for (var i=0;i<state.classes.length;i++){ if (state.classes[i].id === state.currentClassId) return state.classes[i]; }
+    return state.classes[0];
+  }
+
   function loadState(){
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        if (parsed && parsed.windows) return parsed;
+        if (parsed && parsed.windows) return migrateState(parsed);
       }
     } catch(e){}
     return defaultState();
@@ -702,12 +789,17 @@ else if (w.type === "timer"){
     '<button class="tBtn" data-m="-1">-1m</button>' +
     '<button class="tBtn" data-m="1">+1m</button>' +
     '<button class="tBtn" data-m="5">+5m</button>';
+  var rowSet = document.createElement("div");
+  rowSet.className = "timeSetRow";
+  rowSet.innerHTML =
+    '<input type="number" min="0" step="1" placeholder="Minutes" class="timeSetField">' +
+    '<button class="tBtn" data-act="setmin">Set</button>';
   var row2 = document.createElement("div");
   row2.className = "timerBtnRow";
   row2.innerHTML =
     '<button class="tBtn go" data-act="startpause">Start</button>' +
     '<button class="tBtn" data-act="reset">Reset</button>';
-  body.appendChild(digits); body.appendChild(row1); body.appendChild(row2);
+  body.appendChild(digits); body.appendChild(row1); body.appendChild(rowSet); body.appendChild(row2);
   wrap.appendChild(body);
 
   row1.querySelectorAll("button").forEach ? null : null;
@@ -724,6 +816,20 @@ else if (w.type === "timer"){
     })(btns1[i]);
   }
   var btns2 = row2.getElementsByTagName("button");
+  var setField = rowSet.querySelector(".timeSetField");
+  var setBtn = rowSet.querySelector("button");
+  function applyManualMinutes(){
+    var mins = parseFloat(setField.value);
+    if (isNaN(mins) || mins < 0) return;
+    w.seconds = Math.round(mins * 60);
+    if (!w.running) w.remaining = w.seconds;
+    digits.textContent = fmtTime(w.remaining);
+    updateTimerVisual(w, digits, btns2[0]);
+    saveState();
+    setField.value = "";
+  }
+  setBtn.onclick = applyManualMinutes;
+  setField.onkeydown = function(e){ if (e.key === "Enter") applyManualMinutes(); };
   btns2[0].onclick = function(){
     toggleTimer(w, digits, btns2[0]);
   };
@@ -992,11 +1098,37 @@ row.querySelector(".okB").onclick = function(){ var v = input.value; document.bo
 overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(null); } };
 }
 
+function showConfirm(message, cb){
+var overlay = document.createElement("div");
+overlay.className = "modalOverlay";
+var card = document.createElement("div");
+card.className = "modalCard promptCard";
+card.innerHTML = "<h3>" + escapeHtml(message) + "</h3>";
+var row = document.createElement("div");
+row.className = "promptRow";
+row.innerHTML = '<button class="cancelB">Cancel</button><button class="okB">Yes</button>';
+card.appendChild(row);
+overlay.appendChild(card);
+document.body.appendChild(overlay);
+row.querySelector(".cancelB").onclick = function(){ document.body.removeChild(overlay); cb(false); };
+row.querySelector(".okB").onclick = function(){ document.body.removeChild(overlay); cb(true); };
+overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(false); } };
+}
+
+function pad2(n){ return n < 10 ? "0"+n : ""+n; }
+function todayKey(){ var d = new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function fmtDateLabel(key){
+var parts = key.split("-");
+var d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 /* ============================================================
 COG / SETTINGS MODAL
 ============================================================ */
 var AVAILABLE_NEW_WINDOWS = [
 { type: "note", title: "Quick Note", soon: false },
+{ type: "youtube", title: "YouTube Video", soon: false },
 { type: "poll", title: "Live Poll", soon: true },
 { type: "seatchart", title: "Seating Chart", soon: true },
 { type: "clock", title: "Wall Clock", soon: false }
@@ -1059,6 +1191,216 @@ for (var i=0;i<AVAILABLE_NEW_WINDOWS.length;i++){
 addSec.appendChild(grid);
 card.appendChild(addSec);
 
+// class section
+var classSec = document.createElement("div");
+classSec.className = "modalSection";
+classSec.innerHTML = "<label>Class</label>";
+var classRow = document.createElement("div");
+classRow.className = "inlineRow";
+var classSelect = document.createElement("select");
+classSelect.className = "modalSelect";
+function fillClassSelect(){
+  classSelect.innerHTML = "";
+  for (var i=0;i<state.classes.length;i++){
+    var opt = document.createElement("option");
+    opt.value = state.classes[i].id;
+    opt.textContent = state.classes[i].name;
+    if (state.classes[i].id === state.currentClassId) opt.selected = true;
+    classSelect.appendChild(opt);
+  }
+}
+fillClassSelect();
+classSelect.onchange = function(){
+  state.currentClassId = classSelect.value;
+  state.className = getCurrentClass().name;
+  saveState();
+  fillStandardsSetSelect();
+  fillStandardsPickSelect();
+  renderLessonCalendar();
+};
+var newClassBtn = document.createElement("button");
+newClassBtn.className = "smallBtn";
+newClassBtn.textContent = "+ New Class";
+newClassBtn.onclick = function(){
+  showPrompt("New class name", "", function(val){
+    if (val === null) return;
+    val = val.trim();
+    if (!val) return;
+    var id = "class_" + Date.now();
+    state.classes.push({ id:id, name: val, standardsSetId: null, lessons: {} });
+    state.currentClassId = id;
+    state.className = val;
+    saveState();
+    fillClassSelect();
+    fillStandardsSetSelect();
+    fillStandardsPickSelect();
+    renderLessonCalendar();
+  });
+};
+classRow.appendChild(classSelect);
+classRow.appendChild(newClassBtn);
+classSec.appendChild(classRow);
+card.appendChild(classSec);
+
+// standards section
+var stdSec = document.createElement("div");
+stdSec.className = "modalSection";
+stdSec.innerHTML = "<label>State Standards</label>";
+
+var setRow = document.createElement("div");
+setRow.className = "inlineRow";
+var setSelect = document.createElement("select");
+setSelect.className = "modalSelect";
+function fillStandardsSetSelect(){
+  setSelect.innerHTML = "";
+  var noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "(none assigned)";
+  setSelect.appendChild(noneOpt);
+  var cur = getCurrentClass();
+  for (var key in state.standardsSets){
+    var opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = state.standardsSets[key].name;
+    if (cur && cur.standardsSetId === key) opt.selected = true;
+    setSelect.appendChild(opt);
+  }
+  if (!cur || !cur.standardsSetId) noneOpt.selected = true;
+}
+fillStandardsSetSelect();
+setSelect.onchange = function(){
+  var cur = getCurrentClass();
+  cur.standardsSetId = setSelect.value || null;
+  saveState();
+  fillStandardsPickSelect();
+};
+var addSetBtn = document.createElement("button");
+addSetBtn.className = "smallBtn";
+addSetBtn.textContent = "+ New Set";
+addSetBtn.onclick = function(){
+  showPrompt("New standards set name (e.g. the course name)", "", function(name){
+    if (name === null) return;
+    name = name.trim();
+    if (!name) return;
+    showPrompt("Paste the standards for this course, one per line (e.g. \"CODE: description\")", "", function(text){
+      if (text === null) return;
+      var lines = text.split("\n").map(function(l){ return l.trim(); }).filter(function(l){ return l; });
+      var standards = lines.map(function(line, idx){
+        var m = line.match(/^([^\s:]+)\s*[:\-]\s*(.+)$/);
+        if (m) return { code: m[1], text: m[2] };
+        return { code: "Std " + (idx+1), text: line };
+      });
+      var id = "set_" + Date.now();
+      state.standardsSets[id] = { name: name, builtin: false, standards: standards };
+      var cur = getCurrentClass();
+      cur.standardsSetId = id;
+      saveState();
+      fillStandardsSetSelect();
+      fillStandardsPickSelect();
+    }, true);
+  });
+};
+setRow.appendChild(setSelect);
+setRow.appendChild(addSetBtn);
+stdSec.appendChild(setRow);
+
+var pickSelect = document.createElement("select");
+pickSelect.className = "modalSelect";
+function fillStandardsPickSelect(){
+  pickSelect.innerHTML = "";
+  var cur = getCurrentClass();
+  var set = cur && cur.standardsSetId && state.standardsSets[cur.standardsSetId];
+  if (!set || !set.standards.length){
+    var opt = document.createElement("option");
+    opt.textContent = "No standards loaded for this class";
+    pickSelect.appendChild(opt);
+    pickSelect.disabled = true;
+    return;
+  }
+  pickSelect.disabled = false;
+  for (var i=0;i<set.standards.length;i++){
+    var s = set.standards[i];
+    var label = s.code + " — " + (s.text.length > 60 ? s.text.slice(0,60) + "…" : s.text);
+    var opt2 = document.createElement("option");
+    opt2.value = i;
+    opt2.textContent = label;
+    pickSelect.appendChild(opt2);
+  }
+}
+fillStandardsPickSelect();
+stdSec.appendChild(pickSelect);
+
+var showStdBtn = document.createElement("button");
+showStdBtn.className = "exportBtn";
+showStdBtn.textContent = "Show on Scrolling Banner";
+showStdBtn.onclick = function(){
+  var cur = getCurrentClass();
+  var set = cur && cur.standardsSetId && state.standardsSets[cur.standardsSetId];
+  if (!set || pickSelect.disabled) return;
+  var s = set.standards[parseInt(pickSelect.value,10)];
+  if (s) setMarqueeText(s.code + " — " + s.text);
+};
+stdSec.appendChild(showStdBtn);
+card.appendChild(stdSec);
+
+// lesson calendar section
+var calSec = document.createElement("div");
+calSec.className = "modalSection";
+calSec.innerHTML = "<label>Lesson Calendar</label>";
+var todayBtn = document.createElement("button");
+todayBtn.className = "calBtn";
+todayBtn.textContent = "📅 Save today's lesson — " + fmtDateLabel(todayKey());
+todayBtn.onclick = function(){
+  var cur = getCurrentClass();
+  var bw = getWin("bellwork");
+  var content = bw ? (bw.content || "") : "";
+  showConfirm("Save today's Bellwork & Lesson Plan for \"" + cur.name + "\" on " + fmtDateLabel(todayKey()) + "?", function(ok){
+    if (!ok) return;
+    cur.lessons[todayKey()] = { content: content, savedAt: Date.now() };
+    saveState();
+    renderLessonCalendar();
+  });
+};
+calSec.appendChild(todayBtn);
+var lessonList = document.createElement("div");
+lessonList.className = "lessonChipRow";
+function renderLessonCalendar(){
+  lessonList.innerHTML = "";
+  var cur = getCurrentClass();
+  var keys = cur ? Object.keys(cur.lessons || {}) : [];
+  keys.sort().reverse();
+  if (!keys.length){
+    var e = document.createElement("div");
+    e.className = "lessonEmpty";
+    e.textContent = "No saved lessons yet for this class.";
+    lessonList.appendChild(e);
+    return;
+  }
+  for (var i=0;i<keys.length;i++){
+    (function(key){
+      var chip = document.createElement("div");
+      chip.className = "lessonChip";
+      chip.textContent = fmtDateLabel(key);
+      chip.onclick = function(){
+        showConfirm("Load the lesson from " + fmtDateLabel(key) + " into the Bellwork window? This replaces its current content.", function(ok){
+          if (!ok) return;
+          var cur2 = getCurrentClass();
+          var bw = getWin("bellwork");
+          if (bw){
+            bw.content = (cur2.lessons[key] && cur2.lessons[key].content) || "";
+            saveState();
+            renderAll();
+          }
+        });
+      };
+      lessonList.appendChild(chip);
+    })(keys[i]);
+  }
+}
+renderLessonCalendar();
+calSec.appendChild(lessonList);
+card.appendChild(calSec);
+
 // export section
 var expSec = document.createElement("div");
 expSec.className = "modalSection";
@@ -1089,10 +1431,11 @@ overlay.onclick = function(e){ if (e.target === overlay) document.body.removeChi
 function addWindow(type, title){
 var id = type + "_" + Date.now();
 Z += 1;
-var w = { id:id, type:"note", title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: 260, h: 200, z: Z, closed:false, sentAway:false, content:"" };
-if (type === "clock"){
-w.type = "clock";
-}
+var sizeDefaults = { note:{w:260,h:200}, clock:{w:220,h:150}, youtube:{w:340,h:260} };
+var sz = sizeDefaults[type] || {w:260,h:200};
+var w = { id:id, type:type, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: sz.w, h: sz.h, z: Z, closed:false, sentAway:false };
+if (type === "note") w.content = "";
+if (type === "youtube") w.url = "";
 state.windows.push(w);
 saveState();
 renderAll();
