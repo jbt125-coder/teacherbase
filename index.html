@@ -210,6 +210,36 @@ background: #fff; border: 1px solid #e2ddcf; border-radius: 7px; padding: 7px 9p
 .ansItem .txt { color: #2b2318; margin-top: 2px; }
 .ansEmpty { text-align: center; color: #9a9282; font-size: 12px; padding: 20px; }
 
+/* ––––– Random Spinner window ––––– */
+.spinBody { height: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 8px; overflow: auto; }
+.spinModeRow { display: flex; gap: 6px; }
+.spinModeBtn {
+border: 1px solid #c9c2ac; background: #efeade; color: #4a4030; border-radius: 8px;
+padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.spinModeBtn.active { background: #1f8f7d; color: #fff; border-color: #1f8f7d; }
+.spinListRow { width: 100%; display: flex; gap: 6px; align-items: flex-start; }
+.spinListInput {
+flex: 1; border: 1px solid #c9c2ac; border-radius: 6px; padding: 6px 8px; font-size: 12px;
+font-family: inherit; resize: vertical; min-height: 34px;
+}
+.spinWheelWrap { position: relative; width: 200px; height: 200px; flex-shrink: 0; }
+.spinCanvas { width: 200px; height: 200px; border-radius: 50%; display: block; }
+.spinPointer {
+position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent;
+border-top: 15px solid #c1442e; z-index: 2; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
+}
+.spinResult { font-size: 15px; font-weight: 800; color: #2b2318; min-height: 20px; text-align: center; }
+.spinResult.spinning { color: #8a8f96; font-weight: 600; }
+.spinResult.done { color: #1f8f7d; }
+
+/* ––––– Exit Slip window ––––– */
+.exitBody { height: 100%; display: flex; flex-direction: column; }
+.exitQWrap { padding: 8px; background: #efeade; border-bottom: 1px solid #dcd6c6; }
+.exitQLabel { display: block; font-size: 10px; font-weight: 700; color: #6b6152; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.exitQInput { width: 100%; border: 1px solid #c9c2ac; border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 44px; box-sizing: border-box; }
+
 /* ––––– Dock (minimized / off-screen tabs) ––––– */
 #dock {
 position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
@@ -939,6 +969,140 @@ else if (w.type === "answers"){
   };
 }
 
+else if (w.type === "spinner"){
+  w.mode = w.mode || "numbers";
+  if (!w.items || !w.items.length) w.items = [1,2,3,4,5,6,7,8,9,10];
+
+  var body5 = document.createElement("div");
+  body5.className = "spinBody";
+  body5.innerHTML =
+    '<div class="spinModeRow"><button class="spinModeBtn" data-mode="numbers">Numbers</button><button class="spinModeBtn" data-mode="names">Names</button></div>' +
+    '<div class="spinListRow"><textarea class="spinListInput" rows="2" placeholder="Comma or line-separated list..."></textarea><button class="tBtn spinSaveBtn">Save List</button></div>' +
+    '<div class="spinWheelWrap"><div class="spinPointer"></div><canvas class="spinCanvas" width="200" height="200"></canvas></div>' +
+    '<div class="timerBtnRow"><button class="tBtn go spinGoBtn">Spin</button></div>' +
+    '<div class="spinResult"></div>';
+  wrap.appendChild(body5);
+
+  var modeRow = body5.querySelector(".spinModeRow");
+  var listInput = body5.querySelector(".spinListInput");
+  var canvasEl = body5.querySelector(".spinCanvas");
+  var resultEl = body5.querySelector(".spinResult");
+  listInput.value = w.listText || w.items.join(", ");
+
+  function updateModeButtons(){
+    var btns = modeRow.getElementsByTagName("button");
+    for (var i=0;i<btns.length;i++){
+      if (btns[i].getAttribute("data-mode") === w.mode) btns[i].classList.add("active");
+      else btns[i].classList.remove("active");
+    }
+  }
+  updateModeButtons();
+
+  var btnsMode = modeRow.getElementsByTagName("button");
+  for (var mi=0; mi<btnsMode.length; mi++){
+    btnsMode[mi].onclick = (function(btn){
+      return function(){
+        var newMode = btn.getAttribute("data-mode");
+        if (newMode === w.mode) return;
+        w.mode = newMode;
+        w.items = w.mode === "numbers" ? [1,2,3,4,5,6,7,8,9,10] : ["Student 1","Student 2","Student 3"];
+        w.listText = "";
+        listInput.value = w.items.join(", ");
+        updateModeButtons();
+        saveState();
+        drawWheelOnCanvas(canvasEl, w.items);
+      };
+    })(btnsMode[mi]);
+  }
+
+  body5.querySelector(".spinSaveBtn").onclick = function(){
+    var raw = listInput.value;
+    w.listText = raw;
+    var parts = raw.split(/[,\n]/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
+    if (w.mode === "numbers"){
+      w.items = parts.map(function(p){ var n = parseFloat(p); return isNaN(n) ? p : n; });
+    } else {
+      w.items = parts;
+    }
+    if (!w.items.length) w.items = w.mode === "numbers" ? [1,2,3] : ["Student 1"];
+    saveState();
+    drawWheelOnCanvas(canvasEl, w.items);
+  };
+
+  drawWheelOnCanvas(canvasEl, w.items);
+  if (w.lastResult){
+    resultEl.textContent = "🎉 " + w.lastResult;
+    resultEl.className = "spinResult done";
+  }
+
+  var spinnerRotation = w.rotationDeg || 0;
+  canvasEl.style.transform = "rotate(" + spinnerRotation + "deg)";
+
+  body5.querySelector(".spinGoBtn").onclick = function(){
+    if (!w.items.length) return;
+    var n = w.items.length;
+    var winIdx = Math.floor(Math.random()*n);
+    var sliceDeg = 360/n;
+    var targetCenter = winIdx*sliceDeg + sliceDeg/2;
+    var currentMod = ((spinnerRotation % 360) + 360) % 360;
+    var delta = ((-targetCenter - currentMod) % 360 + 360) % 360;
+    spinnerRotation += 360*5 + delta;
+    w.rotationDeg = spinnerRotation;
+    canvasEl.style.transition = "transform 3.2s cubic-bezier(0.15,0.8,0.25,1)";
+    canvasEl.style.transform = "rotate(" + spinnerRotation + "deg)";
+    resultEl.textContent = "Spinning…";
+    resultEl.className = "spinResult spinning";
+    saveState();
+    setTimeout(function(){
+      resultEl.textContent = "🎉 " + w.items[winIdx];
+      resultEl.className = "spinResult done";
+      w.lastResult = String(w.items[winIdx]);
+      saveState();
+    }, 3250);
+  };
+}
+
+else if (w.type === "exitslip"){
+  var body6 = document.createElement("div");
+  body6.className = "exitBody";
+  body6.innerHTML =
+    '<div class="exitQWrap"><label class="exitQLabel">Today\'s Exit Slip Question</label><textarea class="exitQInput" placeholder="Type the exit slip question here..."></textarea></div>' +
+    '<div class="ansToolbar"><input placeholder="Simulate: student name" class="simName"><input placeholder="answer text" class="simText"><button>Add</button></div>' +
+    '<div class="ansFeed"></div>';
+  wrap.appendChild(body6);
+
+  var qInput = body6.querySelector(".exitQInput");
+  qInput.value = w.question || "";
+  qInput.oninput = function(){ w.question = qInput.value; saveState(); };
+
+  var feedEl2 = body6.querySelector(".ansFeed");
+  function refreshFeed2(){
+    feedEl2.innerHTML = "";
+    if (!w.feed || !w.feed.length){
+      feedEl2.innerHTML = '<div class="ansEmpty">No responses yet.</div>';
+      return;
+    }
+    for (var i=w.feed.length-1;i>=0;i--){
+      var it = w.feed[i];
+      var d = document.createElement("div");
+      d.className = "ansItem";
+      d.innerHTML = '<div class="who">' + escapeHtml(it.name) + '</div><div class="txt">' + escapeHtml(it.text) + '</div>';
+      feedEl2.appendChild(d);
+    }
+  }
+  refreshFeed2();
+  var nameI2 = body6.querySelector(".simName");
+  var textI2 = body6.querySelector(".simText");
+  body6.querySelector(".ansToolbar button").onclick = function(){
+    if (!textI2.value.trim()) return;
+    w.feed = w.feed || [];
+    w.feed.push({ name: nameI2.value.trim() || "Student", text: textI2.value.trim(), t: Date.now() });
+    nameI2.value = ""; textI2.value = "";
+    saveState();
+    refreshFeed2();
+  };
+}
+
 return wrap;
 
 }
@@ -947,6 +1111,48 @@ function extractYouTubeId(url){
 if (!url) return null;
 var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
 return m ? m[1] : null;
+}
+
+var SPINNER_PALETTE = ["#e74c3c","#e67e22","#f1c40f","#27ae60","#16a085","#2980b9","#8e44ad","#d35400","#2ecc71","#2c3e50","#c0392b","#f39c12"];
+function spinnerColorAt(i){
+return SPINNER_PALETTE[i % SPINNER_PALETTE.length];
+}
+function drawWheelOnCanvas(canvas, items){
+var ctx = canvas.getContext("2d");
+var size = canvas.width;
+var cx = size/2, cy = size/2, r = size/2 - 3;
+ctx.clearRect(0,0,size,size);
+var n = items.length || 1;
+var sliceRad = (2*Math.PI)/n;
+for (var i=0;i<n;i++){
+var start = i*sliceRad - Math.PI/2;
+var end = start + sliceRad;
+ctx.beginPath();
+ctx.moveTo(cx,cy);
+ctx.arc(cx,cy,r,start,end);
+ctx.closePath();
+ctx.fillStyle = spinnerColorAt(i);
+ctx.fill();
+ctx.strokeStyle = "rgba(0,0,0,0.2)";
+ctx.lineWidth = 1;
+ctx.stroke();
+ctx.save();
+ctx.translate(cx,cy);
+ctx.rotate(start + sliceRad/2);
+ctx.textAlign = "right";
+ctx.textBaseline = "middle";
+ctx.fillStyle = "#fff";
+ctx.font = "bold 12px -apple-system, sans-serif";
+var label = String(items[i]);
+if (label.length > 10) label = label.slice(0,9) + "…";
+ctx.fillText(label, r-8, 0);
+ctx.restore();
+}
+ctx.beginPath();
+ctx.arc(cx,cy,r,0,Math.PI*2);
+ctx.strokeStyle = "rgba(0,0,0,0.25)";
+ctx.lineWidth = 2;
+ctx.stroke();
 }
 
 function fmtTime(s){
@@ -1129,6 +1335,8 @@ COG / SETTINGS MODAL
 var AVAILABLE_NEW_WINDOWS = [
 { type: "note", title: "Quick Note", soon: false },
 { type: "youtube", title: "YouTube Video", soon: false },
+{ type: "spinner", title: "Random Spinner", soon: false },
+{ type: "exitslip", title: "Exit Slip", soon: false },
 { type: "poll", title: "Live Poll", soon: true },
 { type: "seatchart", title: "Seating Chart", soon: true },
 { type: "clock", title: "Wall Clock", soon: false }
@@ -1431,11 +1639,13 @@ overlay.onclick = function(e){ if (e.target === overlay) document.body.removeChi
 function addWindow(type, title){
 var id = type + "_" + Date.now();
 Z += 1;
-var sizeDefaults = { note:{w:260,h:200}, clock:{w:220,h:150}, youtube:{w:340,h:260} };
+var sizeDefaults = { note:{w:260,h:200}, clock:{w:220,h:150}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320} };
 var sz = sizeDefaults[type] || {w:260,h:200};
 var w = { id:id, type:type, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: sz.w, h: sz.h, z: Z, closed:false, sentAway:false };
 if (type === "note") w.content = "";
 if (type === "youtube") w.url = "";
+if (type === "spinner"){ w.mode = "numbers"; w.items = [1,2,3,4,5,6,7,8,9,10]; w.listText = ""; }
+if (type === "exitslip"){ w.question = ""; w.feed = []; }
 state.windows.push(w);
 saveState();
 renderAll();
