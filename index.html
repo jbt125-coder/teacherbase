@@ -365,6 +365,19 @@ cursor: pointer; border: 1px solid #2f4160;
 .stdText { font-size: 12.5px; color: #dce6f0; line-height: 1.4; }
 .stdItem.selected .stdText { color: #fff; }
 .stdEmpty { padding: 14px; font-size: 12px; color: #6f83a0; text-align: center; }
+.schedList { border: 1px solid #35455c; border-radius: 9px; margin-bottom: 8px; max-height: 180px; overflow-y: auto; }
+.schedRow { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; border-bottom: 1px solid #2c3a4f; }
+.schedRow:last-child { border-bottom: none; }
+.schedName { font-size: 13px; font-weight: 700; color: #dce6f0; }
+.schedMeta { font-size: 11px; color: #8fa3ba; margin-top: 1px; }
+.schedBtns { display: flex; gap: 4px; flex-shrink: 0; }
+.dayAssignGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0; }
+.dayAssignCell { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.dayAssignCell label { font-size: 10px; color: #8fa3ba; font-weight: 700; text-transform: uppercase; }
+.dayAssignCell select {
+width: 100%; font-size: 11px; padding: 5px 2px; border-radius: 6px; border: 1px solid #35455c;
+background: #242f42; color: #dce6f0;
+}
 
 /* small text prompt modal for marquee edit */
 .promptCard input, .promptCard textarea {
@@ -457,6 +470,31 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     };
   }
 
+  function defaultBellSchedules(){
+    return {
+      monday: { name: "Monday", builtin: true, periods: [
+        { label: "Per. 1", start: 8*60+40, end: 9*60+29 },
+        { label: "Per. 2", start: 9*60+33, end: 10*60+22 },
+        { label: "Per. 3", start: 10*60+26, end: 11*60+15 },
+        { label: "Per. 4", start: 11*60+19, end: 12*60+8 },
+        { label: "Lunch", start: 12*60+8, end: 12*60+38 },
+        { label: "Per. 5", start: 12*60+42, end: 13*60+31 },
+        { label: "Per. 6", start: 13*60+35, end: 14*60+24 },
+        { label: "Per. 7", start: 14*60+28, end: 15*60+17 }
+      ]},
+      tuesFri: { name: "Tuesday - Friday", builtin: true, periods: [
+        { label: "Per. 1", start: 8*60+40, end: 9*60+29 },
+        { label: "Per. 2", start: 9*60+33, end: 10*60+22 },
+        { label: "Per. 3", start: 10*60+26, end: 11*60+15 },
+        { label: "Per. 4", start: 11*60+19, end: 12*60+8 },
+        { label: "Lunch", start: 12*60+8, end: 12*60+38 },
+        { label: "Per. 5", start: 12*60+42, end: 13*60+31 },
+        { label: "Per. 6", start: 13*60+35, end: 14*60+24 },
+        { label: "Per. 7", start: 14*60+28, end: 15*60+17 }
+      ]}
+    };
+  }
+
   function defaultState(){
     return {
       theme: "slate",
@@ -467,6 +505,9 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
         { id: "class1", name: "Period 3 - Earth Space Science", standardsSetId: "fl_ess", lessons: {} }
       ],
       standardsSets: defaultStandardsSets(),
+      bellSchedules: defaultBellSchedules(),
+      bellScheduleAssignments: { 1: "monday", 2: "tuesFri", 3: "tuesFri", 4: "tuesFri", 5: "tuesFri" },
+      scheduleDateOverrides: {},
       windows: [
         { id: "bellwork", type: "bellwork", title: "Bellwork & Lesson Plan", x: 20, y: 16, w: 480, h: 420, z: 1, closed: false, sentAway: false, content: "BELLWORK (10 min)\n1. What percent of Earth's water is fresh water?\n2. Name the 3 states of water in the water cycle.\n\nLESSON PLAN - Unit 1: Weather & Water Cycle\n- Warm up / bellwork review\n- Notes: Evaporation, Condensation, Precipitation\n- Florida rain gauge lab (grocery store cups)\n- Exit ticket" },
         { id: "timer", type: "timer", title: "Timer", x: 520, y: 16, w: 260, h: 220, z: 2, closed: false, sentAway: false, seconds: 600, remaining: 600, running: false },
@@ -486,6 +527,9 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
       if (!s.classes[i].lessons) s.classes[i].lessons = {};
     }
     if (!s.currentClassId) s.currentClassId = s.classes[0].id;
+    if (!s.bellSchedules) s.bellSchedules = defaultBellSchedules();
+    if (!s.bellScheduleAssignments) s.bellScheduleAssignments = { 1: "monday", 2: "tuesFri", 3: "tuesFri", 4: "tuesFri", 5: "tuesFri" };
+    if (!s.scheduleDateOverrides) s.scheduleDateOverrides = {};
     return s;
   }
 
@@ -1444,6 +1488,70 @@ row.querySelector(".okB").onclick = function(){ var v = input.value; document.bo
 overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(null); } };
 }
 
+/* ============================================================
+BELL SCHEDULES
+============================================================ */
+function parseTimeToMinutes(str){
+str = String(str).trim().toLowerCase();
+var m = str.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
+if (!m) return null;
+var h = parseInt(m[1],10), min = parseInt(m[2],10), mer = m[3];
+if (h > 23 || min > 59) return null;
+if (mer === "pm" && h !== 12) h += 12;
+else if (mer === "am" && h === 12) h = 0;
+else if (!mer){
+  if (h >= 1 && h <= 6) h += 12;
+}
+return h*60 + min;
+}
+function formatMinutesLabel(mins){
+mins = ((mins % 1440) + 1440) % 1440;
+var h = Math.floor(mins/60), m = mins%60;
+var mer = h >= 12 ? "PM" : "AM";
+var h12 = h % 12; if (h12 === 0) h12 = 12;
+return h12 + ":" + (m<10?"0"+m:""+m) + " " + mer;
+}
+function parseScheduleText(text){
+var lines = text.split("\n").map(function(l){ return l.trim(); }).filter(function(l){ return l; });
+var periods = [];
+for (var i=0;i<lines.length;i++){
+  var m = lines[i].match(/^(.+?):\s*([^\-–]+?)\s*[-–]\s*(.+)$/);
+  if (!m) continue;
+  var start = parseTimeToMinutes(m[2]);
+  var end = parseTimeToMinutes(m[3]);
+  if (start === null || end === null) continue;
+  periods.push({ label: m[1].trim(), start: start, end: end });
+}
+return periods;
+}
+function serializeScheduleText(periods){
+return (periods||[]).map(function(p){
+  return p.label + ": " + formatMinutesLabel(p.start) + " - " + formatMinutesLabel(p.end);
+}).join("\n");
+}
+function getActiveSchedule(){
+var key = todayKey();
+var overrideId = state.scheduleDateOverrides && state.scheduleDateOverrides[key];
+if (overrideId && state.bellSchedules[overrideId]) return state.bellSchedules[overrideId];
+var day = new Date().getDay();
+var assignedId = state.bellScheduleAssignments && state.bellScheduleAssignments[day];
+if (assignedId && state.bellSchedules[assignedId]) return state.bellSchedules[assignedId];
+return null;
+}
+function getCurrentPeriodLabel(){
+var sched = getActiveSchedule();
+if (!sched || !sched.periods || !sched.periods.length) return null;
+var now = new Date();
+var mins = now.getHours()*60 + now.getMinutes();
+for (var i=0;i<sched.periods.length;i++){
+  var p = sched.periods[i];
+  if (mins >= p.start && mins < p.end){
+    return p.label + ": " + formatMinutesLabel(p.start) + " - " + formatMinutesLabel(p.end);
+  }
+}
+return null;
+}
+
 function showConfirm(message, cb){
 var overlay = document.createElement("div");
 overlay.className = "modalOverlay";
@@ -1759,6 +1867,155 @@ renderLessonCalendar();
 calSec.appendChild(lessonList);
 card.appendChild(calSec);
 
+// bell schedule section
+var schedSec = document.createElement("div");
+schedSec.className = "modalSection";
+schedSec.innerHTML = "<label>Bell Schedule</label>";
+
+var schedListWrap = document.createElement("div");
+schedListWrap.className = "schedList";
+function fillSchedList(){
+  schedListWrap.innerHTML = "";
+  var ids = Object.keys(state.bellSchedules);
+  for (var i=0;i<ids.length;i++){
+    (function(id){
+      var sc = state.bellSchedules[id];
+      var row = document.createElement("div");
+      row.className = "schedRow";
+      row.innerHTML =
+        '<div><div class="schedName">' + escapeHtml(sc.name) + '</div>' +
+        '<div class="schedMeta">' + (sc.periods ? sc.periods.length : 0) + ' period' + ((sc.periods && sc.periods.length===1) ? "" : "s") + '</div></div>' +
+        '<div class="schedBtns"><button class="smallBtn schedEditBtn">Edit</button>' + (sc.builtin ? "" : '<button class="smallBtn schedDelBtn">Delete</button>') + '</div>';
+      row.querySelector(".schedEditBtn").onclick = function(){
+        showPrompt('Edit periods for "' + sc.name + '" (one per line, e.g. Per. 1: 8:40-9:29)', serializeScheduleText(sc.periods), function(text){
+          if (text === null) return;
+          sc.periods = parseScheduleText(text);
+          saveState();
+          fillSchedList();
+        }, true);
+      };
+      var delBtn = row.querySelector(".schedDelBtn");
+      if (delBtn){
+        delBtn.onclick = function(){
+          showConfirm('Delete the "' + sc.name + '" schedule?', function(ok){
+            if (!ok) return;
+            delete state.bellSchedules[id];
+            for (var day in state.bellScheduleAssignments){
+              if (state.bellScheduleAssignments[day] === id) delete state.bellScheduleAssignments[day];
+            }
+            for (var dkey in state.scheduleDateOverrides){
+              if (state.scheduleDateOverrides[dkey] === id) delete state.scheduleDateOverrides[dkey];
+            }
+            saveState();
+            fillSchedList();
+            fillDayAssignSelects();
+            fillOverrideSelect();
+          });
+        };
+      }
+      schedListWrap.appendChild(row);
+    })(ids[i]);
+  }
+}
+fillSchedList();
+schedSec.appendChild(schedListWrap);
+
+var addSchedBtn = document.createElement("button");
+addSchedBtn.className = "smallBtn";
+addSchedBtn.textContent = "+ New Schedule";
+addSchedBtn.style.marginBottom = "10px";
+addSchedBtn.onclick = function(){
+  showPrompt("New schedule name (e.g. Pep Rally Day)", "", function(name){
+    if (name === null) return;
+    name = name.trim();
+    if (!name) return;
+    showPrompt("Paste periods, one per line, like:\nPer. 1: 8:40-9:29\nPer. 2: 9:33-10:22", "", function(text){
+      if (text === null) return;
+      var id = "sched_" + Date.now();
+      state.bellSchedules[id] = { name: name, builtin: false, periods: parseScheduleText(text) };
+      saveState();
+      fillSchedList();
+      fillDayAssignSelects();
+      fillOverrideSelect();
+    }, true);
+  });
+};
+schedSec.appendChild(addSchedBtn);
+
+var dayLabels = ["Mon","Tue","Wed","Thu","Fri"];
+var dayIndices = [1,2,3,4,5];
+var dayGrid = document.createElement("div");
+dayGrid.className = "dayAssignGrid";
+function fillDayAssignSelects(){
+  dayGrid.innerHTML = "";
+  for (var i=0;i<dayIndices.length;i++){
+    (function(dayNum, label){
+      var cell = document.createElement("div");
+      cell.className = "dayAssignCell";
+      var sel = document.createElement("select");
+      var noneOpt = document.createElement("option");
+      noneOpt.value = "";
+      noneOpt.textContent = "None";
+      sel.appendChild(noneOpt);
+      for (var id in state.bellSchedules){
+        var opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = state.bellSchedules[id].name;
+        if (state.bellScheduleAssignments[dayNum] === id) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      if (!state.bellScheduleAssignments[dayNum]) noneOpt.selected = true;
+      sel.onchange = function(){
+        if (sel.value) state.bellScheduleAssignments[dayNum] = sel.value;
+        else delete state.bellScheduleAssignments[dayNum];
+        saveState();
+      };
+      cell.innerHTML = "<label>" + label + "</label>";
+      cell.appendChild(sel);
+      dayGrid.appendChild(cell);
+    })(dayIndices[i], dayLabels[i]);
+  }
+}
+fillDayAssignSelects();
+schedSec.appendChild(dayGrid);
+
+var overrideRow = document.createElement("div");
+overrideRow.className = "inlineRow";
+var overrideSelect = document.createElement("select");
+overrideSelect.className = "modalSelect";
+function fillOverrideSelect(){
+  overrideSelect.innerHTML = "";
+  var noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "Use normal weekday schedule";
+  overrideSelect.appendChild(noneOpt);
+  for (var id in state.bellSchedules){
+    var opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = state.bellSchedules[id].name;
+    overrideSelect.appendChild(opt);
+  }
+  overrideSelect.value = state.scheduleDateOverrides[todayKey()] || "";
+}
+fillOverrideSelect();
+var applyOverrideBtn = document.createElement("button");
+applyOverrideBtn.className = "smallBtn";
+applyOverrideBtn.textContent = "Apply to Today";
+applyOverrideBtn.onclick = function(){
+  if (overrideSelect.value) state.scheduleDateOverrides[todayKey()] = overrideSelect.value;
+  else delete state.scheduleDateOverrides[todayKey()];
+  saveState();
+};
+overrideRow.appendChild(overrideSelect);
+overrideRow.appendChild(applyOverrideBtn);
+schedSec.appendChild(overrideRow);
+var overrideNote = document.createElement("div");
+overrideNote.className = "comingSoonNote";
+overrideNote.textContent = "Use this for one-off days like a pep rally or club day — it only affects today's date.";
+schedSec.appendChild(overrideNote);
+
+card.appendChild(schedSec);
+
 // export section
 var expSec = document.createElement("div");
 expSec.className = "modalSection";
@@ -1817,12 +2074,16 @@ var d = document.createElement("div");
 d.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(28px,10vmin,52px);font-weight:700;color:#1d3d3a;";
 var dateEl = document.createElement("div");
 dateEl.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(13px,4vmin,20px);font-weight:600;color:#5c6b68;";
+var periodEl = document.createElement("div");
+periodEl.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(12px,3.4vmin,17px);font-weight:700;color:#1f8f7d;";
 wrap2.appendChild(d);
 wrap2.appendChild(dateEl);
+wrap2.appendChild(periodEl);
 function tick(){
 var now = new Date();
 d.textContent = now.toLocaleTimeString();
 dateEl.textContent = (now.getMonth()+1) + "/" + now.getDate() + "/" + String(now.getFullYear()).slice(-2);
+periodEl.textContent = getCurrentPeriodLabel() || "";
 }
 tick();
 setInterval(tick, 1000);
