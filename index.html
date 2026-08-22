@@ -332,6 +332,16 @@ cursor: pointer; border: 1px solid #2f4160;
 }
 .lessonChip:active { background: #2c3a52; }
 .lessonEmpty { font-size: 11px; color: #6f83a0; }
+.stdList { max-height: 240px; overflow-y: auto; border: 1px solid #35455c; border-radius: 9px; margin-bottom: 8px; }
+.stdItem { padding: 9px 10px; border-bottom: 1px solid #2c3a4f; cursor: pointer; }
+.stdItem:last-child { border-bottom: none; }
+.stdItem:active { background: #202b3d; }
+.stdItem.selected { background: #1f8f7d; }
+.stdCode { font-size: 11px; font-weight: 800; color: #8fa3ba; letter-spacing: 0.3px; margin-bottom: 3px; }
+.stdItem.selected .stdCode { color: #d6f5ee; }
+.stdText { font-size: 12.5px; color: #dce6f0; line-height: 1.4; }
+.stdItem.selected .stdText { color: #fff; }
+.stdEmpty { padding: 14px; font-size: 12px; color: #6f83a0; text-align: center; }
 
 /* small text prompt modal for marquee edit */
 .promptCard input, .promptCard textarea {
@@ -1562,31 +1572,41 @@ setRow.appendChild(setSelect);
 setRow.appendChild(addSetBtn);
 stdSec.appendChild(setRow);
 
-var pickSelect = document.createElement("select");
-pickSelect.className = "modalSelect";
+var stdListWrap = document.createElement("div");
+stdListWrap.className = "stdList";
+var selectedStdIndex = 0;
 function fillStandardsPickSelect(){
-  pickSelect.innerHTML = "";
+  stdListWrap.innerHTML = "";
+  selectedStdIndex = 0;
   var cur = getCurrentClass();
   var set = cur && cur.standardsSetId && state.standardsSets[cur.standardsSetId];
   if (!set || !set.standards.length){
-    var opt = document.createElement("option");
-    opt.textContent = "No standards loaded for this class";
-    pickSelect.appendChild(opt);
-    pickSelect.disabled = true;
+    var empty = document.createElement("div");
+    empty.className = "stdEmpty";
+    empty.textContent = "No standards loaded for this class.";
+    stdListWrap.appendChild(empty);
+    stdListWrap.setAttribute("data-disabled", "1");
     return;
   }
-  pickSelect.disabled = false;
+  stdListWrap.setAttribute("data-disabled", "");
   for (var i=0;i<set.standards.length;i++){
-    var s = set.standards[i];
-    var label = s.code + " — " + (s.text.length > 60 ? s.text.slice(0,60) + "…" : s.text);
-    var opt2 = document.createElement("option");
-    opt2.value = i;
-    opt2.textContent = label;
-    pickSelect.appendChild(opt2);
+    (function(i){
+      var s = set.standards[i];
+      var item = document.createElement("div");
+      item.className = "stdItem" + (i === selectedStdIndex ? " selected" : "");
+      item.innerHTML = '<div class="stdCode">' + escapeHtml(s.code) + '</div><div class="stdText">' + escapeHtml(s.text) + '</div>';
+      item.onclick = function(){
+        selectedStdIndex = i;
+        var items = stdListWrap.getElementsByClassName("stdItem");
+        for (var j=0;j<items.length;j++) items[j].classList.remove("selected");
+        item.classList.add("selected");
+      };
+      stdListWrap.appendChild(item);
+    })(i);
   }
 }
 fillStandardsPickSelect();
-stdSec.appendChild(pickSelect);
+stdSec.appendChild(stdListWrap);
 
 var showStdBtn = document.createElement("button");
 showStdBtn.className = "exportBtn";
@@ -1594,8 +1614,8 @@ showStdBtn.textContent = "Show on Scrolling Banner";
 showStdBtn.onclick = function(){
   var cur = getCurrentClass();
   var set = cur && cur.standardsSetId && state.standardsSets[cur.standardsSetId];
-  if (!set || pickSelect.disabled) return;
-  var s = set.standards[parseInt(pickSelect.value,10)];
+  if (!set || stdListWrap.getAttribute("data-disabled") === "1") return;
+  var s = set.standards[selectedStdIndex];
   if (s) setMarqueeText(s.code + " — " + s.text);
 };
 stdSec.appendChild(showStdBtn);
@@ -1689,7 +1709,7 @@ overlay.onclick = function(e){ if (e.target === overlay) document.body.removeChi
 function addWindow(type, title){
 var id = type + "_" + Date.now();
 Z += 1;
-var sizeDefaults = { note:{w:260,h:200}, clock:{w:220,h:150}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320} };
+var sizeDefaults = { note:{w:260,h:200}, clock:{w:240,h:190}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320} };
 var sz = sizeDefaults[type] || {w:260,h:200};
 var w = { id:id, type:type, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: sz.w, h: sz.h, z: Z, closed:false, sentAway:false };
 if (type === "note") w.content = "";
@@ -1716,11 +1736,18 @@ return wrap;
 }
 if (w.type === "clock"){
 var wrap2 = document.createElement("div");
-wrap2.style.cssText = "height:100%;display:flex;align-items:center;justify-content:center;";
+wrap2.style.cssText = "height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;";
 var d = document.createElement("div");
 d.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(28px,10vmin,52px);font-weight:700;color:#1d3d3a;";
+var dateEl = document.createElement("div");
+dateEl.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(13px,4vmin,20px);font-weight:600;color:#5c6b68;";
 wrap2.appendChild(d);
-function tick(){ d.textContent = new Date().toLocaleTimeString(); }
+wrap2.appendChild(dateEl);
+function tick(){
+var now = new Date();
+d.textContent = now.toLocaleTimeString();
+dateEl.textContent = (now.getMonth()+1) + "/" + now.getDate() + "/" + String(now.getFullYear()).slice(-2);
+}
 tick();
 setInterval(tick, 1000);
 return wrap2;
