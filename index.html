@@ -94,6 +94,8 @@ display: flex; align-items: center; justify-content: center; margin-left: 2px;
 }
 .winBtn:active { background: rgba(0,0,0,0.08); }
 .winBtn.close:active { background: #d8564a; color: #fff; }
+.winBtn.deleteForever { color: #a3453a; font-size: 12px; }
+.winBtn.deleteForever:active { background: #d8564a; color: #fff; }
 .winBody { flex: 1; overflow: auto; position: relative; }
 .resizeHandle {
 position: absolute; right: 0; bottom: 0; width: 22px; height: 22px;
@@ -601,6 +603,11 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     return null;
   }
 
+  function getWinByType(type){
+    for (var i=0;i<state.windows.length;i++){ if (state.windows[i].type === type) return state.windows[i]; }
+    return null;
+  }
+
   function bringToFront(w){
     Z += 1; w.z = Z;
     var el = document.getElementById("winel_"+w.id);
@@ -704,7 +711,8 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
       '<div class="winTitle">' + escapeHtml(w.title) + '</div>' +
       '<button class="winBtn popout" title="Pop out to another window">&#8663;</button>' +
       '<button class="winBtn sendAway" title="Send to other screen">&#8674;</button>' +
-      '<button class="winBtn close" title="Close">&#10005;</button>';
+      '<button class="winBtn close" title="Minimize to dock (can reopen later)">&#10005;</button>' +
+      '<button class="winBtn deleteForever" title="Delete this window forever">&#128465;</button>';
     el.appendChild(head);
 
     var body = document.createElement("div");
@@ -722,6 +730,16 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     head.querySelector(".close").onclick = function(){ w.closed = true; saveState(); renderAll(); };
     head.querySelector(".sendAway").onclick = function(){ sendAwayAnim(el, w); };
     head.querySelector(".popout").onclick = function(){ popOutWindow(w); };
+    head.querySelector(".deleteForever").onclick = function(){
+      showConfirm('Delete "' + w.title + '" forever? Its content will be lost, but you can add a fresh one from the cog menu.', function(ok){
+        if (!ok) return;
+        stopTimerInterval(w);
+        var idx = state.windows.indexOf(w);
+        if (idx !== -1) state.windows.splice(idx, 1);
+        saveState();
+        renderAll();
+      });
+    };
 
     el.addEventListener("mousedown", function(){ bringToFront(w); saveState(); });
     makeDraggable(el, head, w);
@@ -1581,6 +1599,10 @@ return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "
 COG / SETTINGS MODAL
 ============================================================ */
 var AVAILABLE_NEW_WINDOWS = [
+{ type: "bellwork", title: "Bellwork & Lesson Plan", soon: false },
+{ type: "timer", title: "Timer", soon: false },
+{ type: "signin", title: "Student Sign-In", soon: false },
+{ type: "answers", title: "Student Answers", soon: false },
 { type: "note", title: "Quick Note", soon: false },
 { type: "youtube", title: "YouTube Video", soon: false },
 { type: "spinner", title: "Random Spinner", soon: false },
@@ -1854,7 +1876,7 @@ todayBtn.className = "calBtn";
 todayBtn.textContent = "📅 Save today's lesson — " + fmtDateLabel(todayKey());
 todayBtn.onclick = function(){
   var cur = getCurrentClass();
-  var bw = getWin("bellwork");
+  var bw = getWinByType("bellwork");
   var content = bw ? (bw.content || "") : "";
   showConfirm("Save today's Bellwork & Lesson Plan for \"" + cur.name + "\" on " + fmtDateLabel(todayKey()) + "?", function(ok){
     if (!ok) return;
@@ -1887,7 +1909,7 @@ function renderLessonCalendar(){
         showConfirm("Load the lesson from " + fmtDateLabel(key) + " into the Bellwork window? This replaces its current content.", function(ok){
           if (!ok) return;
           var cur2 = getCurrentClass();
-          var bw = getWin("bellwork");
+          var bw = getWinByType("bellwork");
           if (bw){
             bw.content = (cur2.lessons[key] && cur2.lessons[key].content) || "";
             saveState();
@@ -2082,13 +2104,20 @@ overlay.onclick = function(e){ if (e.target === overlay) document.body.removeChi
 function addWindow(type, title){
 var id = type + "_" + Date.now();
 Z += 1;
-var sizeDefaults = { note:{w:260,h:200}, clock:{w:240,h:190}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320} };
+var sizeDefaults = {
+  note:{w:260,h:200}, clock:{w:240,h:190}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320},
+  bellwork:{w:480,h:420}, timer:{w:260,h:220}, signin:{w:260,h:260}, answers:{w:300,h:260}
+};
 var sz = sizeDefaults[type] || {w:260,h:200};
 var w = { id:id, type:type, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: sz.w, h: sz.h, z: Z, closed:false, sentAway:false };
 if (type === "note") w.content = "";
 if (type === "youtube") w.url = "";
 if (type === "spinner"){ w.mode = "numbers"; w.rangeMin = 1; w.rangeMax = 10; w.namesList = ["Student 1","Student 2","Student 3"]; w.namesListText = "Student 1, Student 2, Student 3"; }
 if (type === "exitslip"){ w.question = ""; w.feed = []; }
+if (type === "bellwork") w.content = "";
+if (type === "timer"){ w.seconds = 600; w.remaining = 600; w.running = false; }
+if (type === "signin") w.roster = [];
+if (type === "answers") w.feed = [];
 state.windows.push(w);
 saveState();
 renderAll();
