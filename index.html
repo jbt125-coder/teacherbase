@@ -1647,6 +1647,42 @@ for (var i=0;i<AVAILABLE_NEW_WINDOWS.length;i++){
 addSec.appendChild(grid);
 card.appendChild(addSec);
 
+// closed windows section
+var closedSec = document.createElement("div");
+closedSec.className = "modalSection";
+closedSec.innerHTML = "<label>Closed Windows</label>";
+var closedListWrap = document.createElement("div");
+closedListWrap.className = "schedList";
+function fillClosedList(){
+  closedListWrap.innerHTML = "";
+  var closedWins = state.windows.filter(function(win){ return win.closed; });
+  if (!closedWins.length){
+    var empty = document.createElement("div");
+    empty.className = "stdEmpty";
+    empty.textContent = "No windows are closed right now.";
+    closedListWrap.appendChild(empty);
+    return;
+  }
+  for (var i=0;i<closedWins.length;i++){
+    (function(win){
+      var row = document.createElement("div");
+      row.className = "schedRow";
+      row.innerHTML = '<div class="schedName">' + escapeHtml(win.title) + '</div><div class="schedBtns"><button class="smallBtn">Reopen</button></div>';
+      row.querySelector("button").onclick = function(){
+        win.closed = false;
+        bringToFront(win);
+        saveState();
+        renderAll();
+        fillClosedList();
+      };
+      closedListWrap.appendChild(row);
+    })(closedWins[i]);
+  }
+}
+fillClosedList();
+closedSec.appendChild(closedListWrap);
+card.appendChild(closedSec);
+
 // class section
 var classSec = document.createElement("div");
 classSec.className = "modalSection";
