@@ -913,10 +913,16 @@ function urlToHref(url){
   return /^www\./i.test(url) ? "https://" + url : url;
 }
 
+function isGifUrl(url){
+  return /\.gif(\?[^\s]*)?(#[^\s]*)?$/i.test(url);
+}
+
 function linkifyPlainText(text){
   var esc = escapeHtml(text).replace(/\n/g, "<br>");
   return esc.replace(URL_MATCH_RE, function(match){
-    return '<a href="' + urlToHref(match) + '">' + match + '</a>';
+    var href = urlToHref(match);
+    if (isGifUrl(match)) return '<img src="' + href + '">';
+    return '<a href="' + href + '">' + match + '</a>';
   });
 }
 
@@ -936,14 +942,20 @@ function autoLinkifyAtCursor(editable, persist){
   var startIdx = offset - url.length;
   var beforeText = node.textContent.slice(0, startIdx);
   var afterText = node.textContent.slice(offset);
-  var a = document.createElement("a");
-  a.href = urlToHref(url);
-  a.textContent = url;
+  var inline;
+  if (isGifUrl(url)){
+    inline = document.createElement("img");
+    inline.src = urlToHref(url);
+  } else {
+    inline = document.createElement("a");
+    inline.href = urlToHref(url);
+    inline.textContent = url;
+  }
   var beforeNode = document.createTextNode(beforeText);
   var afterNode = document.createTextNode(afterText);
   var parent = node.parentNode;
   parent.insertBefore(beforeNode, node);
-  parent.insertBefore(a, node);
+  parent.insertBefore(inline, node);
   parent.insertBefore(afterNode, node);
   parent.removeChild(node);
   var newRange = document.createRange();
