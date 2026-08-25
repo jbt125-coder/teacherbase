@@ -266,7 +266,15 @@ flex: 1; overflow: auto; padding: 14px 16px; font-size: 16px; line-height: 1.5;
 font-family: -apple-system, sans-serif; color: #2b2318; background: #fffdf7; outline: none;
 }
 .richEditable img { max-width: 100%; border-radius: 6px; display: block; margin: 6px 0; }
+.richEditable a { color: #1f6f9c; text-decoration: underline; cursor: pointer; }
+.richEditable table { border-collapse: collapse; margin: 8px 0; }
+.richEditable table td, .richEditable table th { border: 1px solid #c9c2ac; padding: 6px 10px; min-width: 40px; }
 .richEditable:empty:before { content: attr(data-placeholder); color: #a89f8c; pointer-events: none; }
+.richBtnWide {
+height: 26px; padding: 0 8px; border: 1px solid #c9c2ac; border-radius: 5px; background: #fff;
+color: #4a4030; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.richBtnWide:active { background: #e7e2d6; }
 .exitQRich .richToolbar { padding: 4px 6px; }
 .exitQRich .richEditable { flex: none; min-height: 50px; max-height: 140px; padding: 8px; font-size: 13px; background: #fff; }
 
@@ -898,6 +906,137 @@ if (w.type === "bellwork"){
 /* ============================================================
 RICH TEXT EDITOR (bold/underline/size/color + image paste)
 ============================================================ */
+var URL_MATCH_RE = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi;
+var URL_AT_CURSOR_RE = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)$/i;
+
+function urlToHref(url){
+  return /^www\./i.test(url) ? "https://" + url : url;
+}
+
+function linkifyPlainText(text){
+  var esc = escapeHtml(text).replace(/\n/g, "<br>");
+  return esc.replace(URL_MATCH_RE, function(match){
+    return '<a href="' + urlToHref(match) + '">' + match + '</a>';
+  });
+}
+
+function autoLinkifyAtCursor(editable, persist){
+  var sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  var range = sel.getRangeAt(0);
+  if (!range.collapsed) return;
+  var node = range.startContainer;
+  if (node.nodeType !== 3) return;
+  if (node.parentNode && node.parentNode.closest && node.parentNode.closest("a")) return;
+  var offset = range.startOffset;
+  var textBefore = node.textContent.slice(0, offset);
+  var m = textBefore.match(URL_AT_CURSOR_RE);
+  if (!m) return;
+  var url = m[0];
+  var startIdx = offset - url.length;
+  var beforeText = node.textContent.slice(0, startIdx);
+  var afterText = node.textContent.slice(offset);
+  var a = document.createElement("a");
+  a.href = urlToHref(url);
+  a.textContent = url;
+  var beforeNode = document.createTextNode(beforeText);
+  var afterNode = document.createTextNode(afterText);
+  var parent = node.parentNode;
+  parent.insertBefore(beforeNode, node);
+  parent.insertBefore(a, node);
+  parent.insertBefore(afterNode, node);
+  parent.removeChild(node);
+  var newRange = document.createRange();
+  newRange.setStart(afterNode, 0);
+  newRange.setEnd(afterNode, 0);
+  sel.removeAllRanges();
+  sel.addRange(newRange);
+  persist();
+}
+
+function buildTableHtml(rows, cols){
+  var html = '<table><tbody>';
+  for (var r=0;r<rows;r++){
+    html += "<tr>";
+    for (var c=0;c<cols;c++){ html += "<td>&nbsp;</td>"; }
+    html += "</tr>";
+  }
+  html += "</tbody></table><div><br></div>";
+  return html;
+}
+function getSelectedTable(editable){
+  var sel = window.getSelection();
+  if (!sel.rangeCount) return null;
+  var node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType === 3) node = node.parentNode;
+  while (node && node !== editable){
+    if (node.tagName === "TABLE") return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+function tableAddRow(table){
+  var rows = table.rows;
+  if (!rows.length) return;
+  var cols = rows[0].cells.length;
+  var tr = document.createElement("tr");
+  for (var c=0;c<cols;c++){
+    var td = document.createElement("td");
+    td.innerHTML = "&nbsp;";
+    tr.appendChild(td);
+  }
+  (table.tBodies[0] || table).appendChild(tr);
+}
+function tableRemoveRow(table){
+  var rows = table.rows;
+  if (rows.length <= 1) return;
+  rows[rows.length-1].parentNode.removeChild(rows[rows.length-1]);
+}
+function tableAddCol(table){
+  var rows = table.rows;
+  for (var i=0;i<rows.length;i++){
+    var td = document.createElement("td");
+    td.innerHTML = "&nbsp;";
+    rows[i].appendChild(td);
+  }
+}
+function tableRemoveCol(table){
+  var rows = table.rows;
+  if (!rows.length || rows[0].cells.length <= 1) return;
+  for (var i=0;i<rows.length;i++){
+    rows[i].deleteCell(rows[i].cells.length-1);
+  }
+}
+function showTablePrompt(cb){
+  var overlay = document.createElement("div");
+  overlay.className = "modalOverlay";
+  var card = document.createElement("div");
+  card.className = "modalCard promptCard";
+  card.innerHTML =
+    "<h3>Insert Table</h3>" +
+    '<label style="display:block;font-size:11px;color:#8fa3ba;margin-bottom:4px;">Rows</label>' +
+    '<input type="number" min="1" max="20" value="3" class="tblRowsInput">' +
+    '<label style="display:block;font-size:11px;color:#8fa3ba;margin:2px 0 4px;">Columns</label>' +
+    '<input type="number" min="1" max="10" value="3" class="tblColsInput">';
+  var row = document.createElement("div");
+  row.className = "promptRow";
+  row.innerHTML = '<button class="cancelB">Cancel</button><button class="okB">Insert</button>';
+  card.appendChild(row);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  var rowsInput = card.querySelector(".tblRowsInput");
+  var colsInput = card.querySelector(".tblColsInput");
+  rowsInput.focus();
+  row.querySelector(".cancelB").onclick = function(){ document.body.removeChild(overlay); cb(null); };
+  row.querySelector(".okB").onclick = function(){
+    var r = Math.max(1, Math.min(20, parseInt(rowsInput.value,10) || 1));
+    var c = Math.max(1, Math.min(10, parseInt(colsInput.value,10) || 1));
+    document.body.removeChild(overlay);
+    cb({ rows: r, cols: c });
+  };
+  overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(null); } };
+}
+
 function buildRichEditor(w, field, placeholder, extraClass){
 var wrap = document.createElement("div");
 wrap.className = "richWrap" + (extraClass ? " " + extraClass : "");
@@ -913,6 +1052,11 @@ wrap.innerHTML =
       '<option value="6">XX-Large</option>' +
     '</select>' +
     '<input type="color" class="richColor" title="Text color" value="#2b2318">' +
+    '<button type="button" class="richBtnWide richTableBtn" title="Insert a table">&#9638; Table</button>' +
+    '<button type="button" class="richBtnWide richRowAddBtn" title="Add a row to the table under your cursor">+Row</button>' +
+    '<button type="button" class="richBtnWide richRowDelBtn" title="Remove the last row of the table under your cursor">-Row</button>' +
+    '<button type="button" class="richBtnWide richColAddBtn" title="Add a column to the table under your cursor">+Col</button>' +
+    '<button type="button" class="richBtnWide richColDelBtn" title="Remove the last column of the table under your cursor">-Col</button>' +
   '</div>' +
   '<div class="richEditable" contenteditable="true" data-placeholder="' + escapeHtml(placeholder||"") + '"></div>';
 
@@ -927,8 +1071,30 @@ wrap.querySelector(".richBoldBtn").onclick = function(){ editable.focus(); docum
 wrap.querySelector(".richUnderlineBtn").onclick = function(){ editable.focus(); document.execCommand("underline"); persist(); };
 wrap.querySelector(".richSizeSelect").onchange = function(e){ editable.focus(); document.execCommand("fontSize", false, e.target.value); persist(); };
 wrap.querySelector(".richColor").oninput = function(e){ editable.focus(); document.execCommand("foreColor", false, e.target.value); persist(); };
+wrap.querySelector(".richTableBtn").onclick = function(){
+  showTablePrompt(function(res){
+    if (!res) return;
+    editable.focus();
+    document.execCommand("insertHTML", false, buildTableHtml(res.rows, res.cols));
+    persist();
+  });
+};
+wrap.querySelector(".richRowAddBtn").onclick = function(){ editable.focus(); var t = getSelectedTable(editable); if (!t) return; tableAddRow(t); persist(); };
+wrap.querySelector(".richRowDelBtn").onclick = function(){ editable.focus(); var t = getSelectedTable(editable); if (!t) return; tableRemoveRow(t); persist(); };
+wrap.querySelector(".richColAddBtn").onclick = function(){ editable.focus(); var t = getSelectedTable(editable); if (!t) return; tableAddCol(t); persist(); };
+wrap.querySelector(".richColDelBtn").onclick = function(){ editable.focus(); var t = getSelectedTable(editable); if (!t) return; tableRemoveCol(t); persist(); };
 
 editable.addEventListener("input", persist);
+editable.addEventListener("keydown", function(e){
+  if (e.key === " " || e.key === "Enter") autoLinkifyAtCursor(editable, persist);
+});
+editable.addEventListener("click", function(e){
+  var a = e.target.closest && e.target.closest("a");
+  if (a && editable.contains(a)){
+    e.preventDefault();
+    window.open(a.href, "_blank", "noopener,noreferrer");
+  }
+});
 editable.addEventListener("paste", function(e){
   var cd = e.clipboardData || window.clipboardData;
   var items = cd && cd.items;
@@ -948,6 +1114,14 @@ editable.addEventListener("paste", function(e){
         return;
       }
     }
+  }
+  var text = cd && cd.getData ? cd.getData("text/plain") : "";
+  if (text && /(https?:\/\/|www\.)/i.test(text)){
+    e.preventDefault();
+    editable.focus();
+    document.execCommand("insertHTML", false, linkifyPlainText(text));
+    persist();
+    return;
   }
   setTimeout(persist, 0);
 });
