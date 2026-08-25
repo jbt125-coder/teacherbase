@@ -917,11 +917,18 @@ function isGifUrl(url){
   return /\.gif(\?[^\s]*)?(#[^\s]*)?$/i.test(url);
 }
 
+function normalizeGifUrl(url){
+  if (/^https?:\/\/[^\/]*giphy\.com\//i.test(url)){
+    return url.replace(/_s(\.gif)(\?[^\s]*)?$/i, "$1$2");
+  }
+  return url;
+}
+
 function linkifyPlainText(text){
   var esc = escapeHtml(text).replace(/\n/g, "<br>");
   return esc.replace(URL_MATCH_RE, function(match){
     var href = urlToHref(match);
-    if (isGifUrl(match)) return '<img src="' + href + '">';
+    if (isGifUrl(match)) return '<img src="' + normalizeGifUrl(href) + '">';
     return '<a href="' + href + '">' + match + '</a>';
   });
 }
@@ -945,7 +952,7 @@ function autoLinkifyAtCursor(editable, persist){
   var inline;
   if (isGifUrl(url)){
     inline = document.createElement("img");
-    inline.src = urlToHref(url);
+    inline.src = normalizeGifUrl(urlToHref(url));
   } else {
     inline = document.createElement("a");
     inline.href = urlToHref(url);
