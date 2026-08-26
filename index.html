@@ -291,6 +291,13 @@ flex: 1; overflow: auto; padding: 14px 16px; font-size: 16px; line-height: 1.5;
 font-family: -apple-system, sans-serif; color: #2b2318; background: #fffdf7; outline: none;
 }
 .richEditable img { max-width: 100%; border-radius: 6px; display: block; margin: 6px 0; }
+.imgResizeWrap { position: relative; display: inline-block; max-width: 100%; vertical-align: bottom; }
+.imgResizeWrap.selected { outline: 2px solid #1f8f7d; outline-offset: 2px; border-radius: 6px; }
+.imgResizeHandle {
+display: none; position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px;
+background: #1f8f7d; border: 2px solid #fff; border-radius: 4px; cursor: nwse-resize; z-index: 2;
+}
+.imgResizeWrap.selected .imgResizeHandle { display: block; }
 .richEditable a { color: #1f6f9c; text-decoration: underline; cursor: pointer; }
 .richEditable table { border-collapse: collapse; margin: 8px 0; }
 .richEditable table td, .richEditable table th { border: 1px solid #c9c2ac; padding: 6px 10px; min-width: 40px; }
@@ -1081,6 +1088,20 @@ function showTablePrompt(cb){
   overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(null); } };
 }
 
+function wrapImageForResize(img){
+  if (img.parentNode && img.parentNode.classList && img.parentNode.classList.contains("imgResizeWrap")){
+    return img.parentNode;
+  }
+  var wrapEl = document.createElement("span");
+  wrapEl.className = "imgResizeWrap";
+  img.parentNode.insertBefore(wrapEl, img);
+  wrapEl.appendChild(img);
+  var handle = document.createElement("span");
+  handle.className = "imgResizeHandle";
+  wrapEl.appendChild(handle);
+  return wrapEl;
+}
+
 function buildRichEditor(w, field, placeholder, extraClass){
 var wrap = document.createElement("div");
 wrap.className = "richWrap" + (extraClass ? " " + extraClass : "");
@@ -1137,8 +1158,54 @@ editable.addEventListener("click", function(e){
   if (a && editable.contains(a)){
     e.preventDefault();
     window.open(a.href, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (e.target.classList && e.target.classList.contains("imgResizeHandle")) return;
+
+  var prevSelected = editable.querySelectorAll(".imgResizeWrap.selected");
+  for (var pi=0;pi<prevSelected.length;pi++){ prevSelected[pi].classList.remove("selected"); }
+
+  if (e.target.tagName === "IMG"){
+    var wrapEl = wrapImageForResize(e.target);
+    wrapEl.classList.add("selected");
   }
 });
+function startImageResize(e, img){
+  e.preventDefault();
+  e.stopPropagation();
+  var startX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+  var startWidth = img.getBoundingClientRect().width;
+  function onMove(ev){
+    var clientX = (ev.touches && ev.touches[0]) ? ev.touches[0].clientX : ev.clientX;
+    var dx = clientX - startX;
+    var newWidth = Math.max(30, Math.round(startWidth + dx));
+    var maxWidth = editable.clientWidth;
+    if (maxWidth && newWidth > maxWidth) newWidth = maxWidth;
+    img.style.width = newWidth + "px";
+    img.style.height = "auto";
+  }
+  function onUp(){
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.removeEventListener("touchmove", onMove);
+    document.removeEventListener("touchend", onUp);
+    persist();
+  }
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+  document.addEventListener("touchmove", onMove, {passive:false});
+  document.addEventListener("touchend", onUp);
+}
+editable.addEventListener("mousedown", function(e){
+  if (e.target.classList && e.target.classList.contains("imgResizeHandle")){
+    startImageResize(e, e.target.parentNode.querySelector("img"));
+  }
+});
+editable.addEventListener("touchstart", function(e){
+  if (e.target.classList && e.target.classList.contains("imgResizeHandle")){
+    startImageResize(e, e.target.parentNode.querySelector("img"));
+  }
+}, {passive:false});
 editable.addEventListener("paste", function(e){
   var cd = e.clipboardData || window.clipboardData;
   var items = cd && cd.items;
