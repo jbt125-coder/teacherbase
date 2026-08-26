@@ -76,6 +76,11 @@ transition: box-shadow .15s, opacity .35s, transform .35s;
 .win.annotationWin {
 background: transparent !important;
 box-shadow: 0 0 0 1px rgba(255,255,255,0.25), 0 6px 20px rgba(0,0,0,0.25) !important;
+flex-direction: column-reverse;
+}
+.win.annotationWin .winHead {
+border-bottom: none;
+border-top: 1px solid rgba(255,255,255,0.15);
 }
 .winHead {
 height: 34px; flex-shrink: 0;
@@ -251,7 +256,7 @@ border-top: 15px solid #c1442e; z-index: 2; filter: drop-shadow(0 1px 1px rgba(0
 .exitQLabel { display: block; font-size: 10px; font-weight: 700; color: #6b6152; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
 
 /* ––––– Transparency Overlay window ––––– */
-.annoBody { height: 100%; display: flex; flex-direction: column; }
+.annoBody { height: 100%; display: flex; flex-direction: column-reverse; }
 .annoToolbar {
 display: flex; align-items: center; gap: 6px; padding: 6px 8px; flex-wrap: wrap; flex-shrink: 0;
 background: rgba(20,27,38,0.55);
