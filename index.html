@@ -442,6 +442,10 @@ cursor: pointer; border: 1px solid #2f4160;
 width: 100%; font-size: 11px; padding: 5px 2px; border-radius: 6px; border: 1px solid #35455c;
 background: #242f42; color: #dce6f0;
 }
+.storBarWrap { margin-bottom: 8px; }
+.storBarLabel { font-size: 11px; color: #8fa3ba; margin-bottom: 5px; }
+.storBarTrack { height: 8px; border-radius: 4px; background: #242f42; overflow: hidden; border: 1px solid #35455c; }
+.storBarFill { height: 100%; background: linear-gradient(90deg, #1f8f7d, #e0a640); }
 
 /* small text prompt modal for marquee edit */
 .promptCard input, .promptCard textarea {
@@ -2179,6 +2183,88 @@ function fillClosedList(){
 fillClosedList();
 closedSec.appendChild(closedListWrap);
 card.appendChild(closedSec);
+
+// storage section
+var storSec = document.createElement("div");
+storSec.className = "modalSection";
+storSec.innerHTML = "<label>Storage</label>";
+
+function estimateSize(obj){
+  try { return JSON.stringify(obj).length; } catch(e){ return 0; }
+}
+function fmtBytes(n){
+  if (n < 1024) return n + " B";
+  if (n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+  return (n/(1024*1024)).toFixed(2) + " MB";
+}
+
+var totalSize = estimateSize(state);
+var STORAGE_ESTIMATE_LIMIT = 5 * 1024 * 1024;
+var storPct = Math.min(100, Math.round((totalSize / STORAGE_ESTIMATE_LIMIT) * 100));
+
+var storBarWrap = document.createElement("div");
+storBarWrap.className = "storBarWrap";
+storBarWrap.innerHTML =
+  '<div class="storBarLabel">' + fmtBytes(totalSize) + ' used (roughly ' + storPct + '% of a typical ~5 MB browser limit)</div>' +
+  '<div class="storBarTrack"><div class="storBarFill" style="width:' + storPct + '%;"></div></div>';
+storSec.appendChild(storBarWrap);
+
+var storItems = [];
+for (var swi=0;swi<state.windows.length;swi++){
+  var swin = state.windows[swi];
+  storItems.push({ label: "Window: " + swin.title, size: estimateSize(swin), kind: "window", ref: swin });
+}
+for (var sci=0;sci<state.classes.length;sci++){
+  var scls = state.classes[sci];
+  var lessonKeys = Object.keys(scls.lessons || {});
+  for (var slk=0;slk<lessonKeys.length;slk++){
+    var lk = lessonKeys[slk];
+    storItems.push({ label: "Saved lesson (" + scls.name + ", " + fmtDateLabel(lk) + ")", size: estimateSize(scls.lessons[lk]), kind: "lesson", classRef: scls, key: lk });
+  }
+}
+storItems.sort(function(a,b){ return b.size - a.size; });
+var storTopItems = storItems.slice(0, 8);
+
+var storNote = document.createElement("div");
+storNote.className = "comingSoonNote";
+storNote.textContent = "Saved lessons each keep their own copy of Bellwork's content, including any images — so pasting an image and saving it to many dates can add up fast. Here are the biggest items right now:";
+storSec.appendChild(storNote);
+
+var storList = document.createElement("div");
+storList.className = "schedList";
+if (!storTopItems.length){
+  var storEmpty = document.createElement("div");
+  storEmpty.className = "stdEmpty";
+  storEmpty.textContent = "Nothing saved yet.";
+  storList.appendChild(storEmpty);
+} else {
+  for (var sti=0;sti<storTopItems.length;sti++){
+    (function(item){
+      var row = document.createElement("div");
+      row.className = "schedRow";
+      row.innerHTML =
+        '<div><div class="schedName">' + escapeHtml(item.label) + '</div><div class="schedMeta">' + fmtBytes(item.size) + '</div></div>' +
+        '<div class="schedBtns"><button class="smallBtn">Delete</button></div>';
+      row.querySelector("button").onclick = function(){
+        showConfirm('Delete "' + item.label + '" to free up space? This cannot be undone.', function(ok){
+          if (!ok) return;
+          if (item.kind === "lesson"){
+            delete item.classRef.lessons[item.key];
+          } else if (item.kind === "window"){
+            var widx = state.windows.indexOf(item.ref);
+            if (widx !== -1) state.windows.splice(widx, 1);
+          }
+          saveState();
+          renderAll();
+          document.body.removeChild(overlay);
+        });
+      };
+      storList.appendChild(row);
+    })(storTopItems[sti]);
+  }
+}
+storSec.appendChild(storList);
+card.appendChild(storSec);
 
 // class section
 var classSec = document.createElement("div");
