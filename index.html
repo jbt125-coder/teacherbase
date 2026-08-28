@@ -390,11 +390,28 @@ border: 1px solid #35455c; background: #242f42; color: #dce6f0; border-radius: 8
 padding: 9px 10px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .smallBtn:active { background: #2c3a52; }
-.calBtn {
-width: 100%; border: 1px solid #35455c; background: #20304a; color: #dce6f0; border-radius: 9px;
-padding: 11px; font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; margin-bottom: 8px;
+.calWrap { margin-bottom: 12px; }
+.calNavRow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.calNavBtn {
+border: 1px solid #35455c; background: #242f42; color: #dce6f0; border-radius: 6px;
+width: 28px; height: 28px; flex-shrink: 0; font-size: 14px; cursor: pointer;
 }
-.calBtn:active { background: #28405e; }
+.calNavBtn:active { background: #2c3a52; }
+.calNavBtn:disabled { opacity: 0.3; cursor: default; }
+.calMonthLabel { flex: 1; text-align: center; font-size: 14px; font-weight: 700; color: #e6ebf1; }
+.calGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.calDowCell { font-size: 10px; font-weight: 700; color: #8fa3ba; text-align: center; padding-bottom: 3px; }
+.calDayCell {
+position: relative; aspect-ratio: 1/1; border: 1px solid #35455c; background: #242f42; color: #dce6f0;
+border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+padding: 0;
+}
+.calDayCell:active { background: #2c3a52; }
+.calDayCell.today { border-color: #1f8f7d; border-width: 2px; font-weight: 800; color: #fff; }
+.calDayCell.hasLesson { background: #1f3d38; }
+.calDayBlank { background: transparent; border: none; cursor: default; }
+.calDot { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: #3ddc9c; }
+.lessonListLabel { font-size: 11px; color: #8fa3ba; margin-bottom: 4px; }
 .lessonChipRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .lessonChip {
 font-size: 11px; padding: 6px 10px; border-radius: 12px; background: #223047; color: #cfe0ee;
@@ -2189,6 +2206,7 @@ classSelect.onchange = function(){
   fillStandardsSetSelect();
   fillStandardsPickSelect();
   renderLessonCalendar();
+  renderCalGrid();
 };
 var newClassBtn = document.createElement("button");
 newClassBtn.className = "smallBtn";
@@ -2207,6 +2225,7 @@ newClassBtn.onclick = function(){
     fillStandardsSetSelect();
     fillStandardsPickSelect();
     renderLessonCalendar();
+    renderCalGrid();
   });
 };
 classRow.appendChild(classSelect);
@@ -2329,21 +2348,109 @@ card.appendChild(stdSec);
 var calSec = document.createElement("div");
 calSec.className = "modalSection";
 calSec.innerHTML = "<label>Lesson Calendar</label>";
-var todayBtn = document.createElement("button");
-todayBtn.className = "calBtn";
-todayBtn.textContent = "📅 Save today's lesson — " + fmtDateLabel(todayKey());
-todayBtn.onclick = function(){
+
+var CAL_MIN_Y = 2026, CAL_MIN_M = 7;   // August 2026
+var CAL_MAX_Y = 2027, CAL_MAX_M = 7;   // August 2027
+var calViewYear = new Date().getFullYear();
+var calViewMonth = new Date().getMonth();
+if (calViewYear < CAL_MIN_Y || (calViewYear === CAL_MIN_Y && calViewMonth < CAL_MIN_M)){
+  calViewYear = CAL_MIN_Y; calViewMonth = CAL_MIN_M;
+} else if (calViewYear > CAL_MAX_Y || (calViewYear === CAL_MAX_Y && calViewMonth > CAL_MAX_M)){
+  calViewYear = CAL_MAX_Y; calViewMonth = CAL_MAX_M;
+}
+
+var calWrap = document.createElement("div");
+calWrap.className = "calWrap";
+calWrap.innerHTML =
+  '<div class="calNavRow">' +
+    '<button type="button" class="calNavBtn calPrevBtn">&#8592;</button>' +
+    '<div class="calMonthLabel"></div>' +
+    '<button type="button" class="calNavBtn calNextBtn">&#8594;</button>' +
+  '</div>' +
+  '<div class="calGrid"></div>';
+calSec.appendChild(calWrap);
+
+var calMonthLabelEl = calWrap.querySelector(".calMonthLabel");
+var calGridEl = calWrap.querySelector(".calGrid");
+var calPrevBtn = calWrap.querySelector(".calPrevBtn");
+var calNextBtn = calWrap.querySelector(".calNextBtn");
+
+var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+var DOW_LABELS = ["S","M","T","W","TH","F","S"];
+
+function calDaysInMonth(y, m){ return new Date(y, m+1, 0).getDate(); }
+function calDateKey(y, m, d){ return y + "-" + pad2(m+1) + "-" + pad2(d); }
+
+function updateCalNavButtons(){
+  calPrevBtn.disabled = (calViewYear === CAL_MIN_Y && calViewMonth === CAL_MIN_M);
+  calNextBtn.disabled = (calViewYear === CAL_MAX_Y && calViewMonth === CAL_MAX_M);
+}
+
+function renderCalGrid(){
+  calMonthLabelEl.textContent = MONTH_NAMES[calViewMonth] + " " + calViewYear;
+  calGridEl.innerHTML = "";
+  for (var i=0;i<7;i++){
+    var dh = document.createElement("div");
+    dh.className = "calDowCell";
+    dh.textContent = DOW_LABELS[i];
+    calGridEl.appendChild(dh);
+  }
+  var firstDow = new Date(calViewYear, calViewMonth, 1).getDay();
+  var totalDays = calDaysInMonth(calViewYear, calViewMonth);
+  var todayK = todayKey();
   var cur = getCurrentClass();
-  var bw = getWinByType("bellwork");
-  var content = bw ? (bw.content || "") : "";
-  showConfirm("Save today's Bellwork & Lesson Plan for \"" + cur.name + "\" on " + fmtDateLabel(todayKey()) + "?", function(ok){
-    if (!ok) return;
-    cur.lessons[todayKey()] = { content: content, savedAt: Date.now() };
-    saveState();
-    renderLessonCalendar();
-  });
+  for (var b=0;b<firstDow;b++){
+    var blank = document.createElement("div");
+    blank.className = "calDayCell calDayBlank";
+    calGridEl.appendChild(blank);
+  }
+  for (var d=1; d<=totalDays; d++){
+    (function(d){
+      var key = calDateKey(calViewYear, calViewMonth, d);
+      var hasLesson = !!(cur && cur.lessons && cur.lessons[key]);
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "calDayCell" + (key === todayK ? " today" : "") + (hasLesson ? " hasLesson" : "");
+      cell.innerHTML = d + (hasLesson ? '<span class="calDot"></span>' : "");
+      cell.onclick = function(){
+        var curNow = getCurrentClass();
+        var bw = getWinByType("bellwork");
+        var content = bw ? (bw.content || "") : "";
+        var overwriting = !!(curNow.lessons && curNow.lessons[key]);
+        showConfirm((overwriting ? "Overwrite the saved lesson" : "Save today's Bellwork & Lesson Plan") + " for \"" + curNow.name + "\" on " + fmtDateLabel(key) + "?", function(ok){
+          if (!ok) return;
+          curNow.lessons[key] = { content: content, savedAt: Date.now() };
+          saveState();
+          renderCalGrid();
+          renderLessonCalendar();
+        });
+      };
+      calGridEl.appendChild(cell);
+    })(d);
+  }
+}
+renderCalGrid();
+updateCalNavButtons();
+
+calPrevBtn.onclick = function(){
+  if (calPrevBtn.disabled) return;
+  calViewMonth--;
+  if (calViewMonth < 0){ calViewMonth = 11; calViewYear--; }
+  renderCalGrid();
+  updateCalNavButtons();
 };
-calSec.appendChild(todayBtn);
+calNextBtn.onclick = function(){
+  if (calNextBtn.disabled) return;
+  calViewMonth++;
+  if (calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
+  renderCalGrid();
+  updateCalNavButtons();
+};
+
+var lessonListLabel = document.createElement("div");
+lessonListLabel.className = "lessonListLabel";
+lessonListLabel.textContent = "Saved lessons (tap to reload into Bellwork)";
+calSec.appendChild(lessonListLabel);
 var lessonList = document.createElement("div");
 lessonList.className = "lessonChipRow";
 function renderLessonCalendar(){
