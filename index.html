@@ -597,7 +597,11 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
   }
 
   function saveState(){
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch(e){
+      alert("This change couldn't be saved (your browser's storage is full). Try removing a large image, GIF, or drawing, then try again.");
+    }
   }
 
   state = loadState();
@@ -1093,6 +1097,31 @@ function showTablePrompt(cb){
   overlay.onclick = function(e){ if (e.target === overlay){ document.body.removeChild(overlay); cb(null); } };
 }
 
+function downscalePastedImage(dataUrl, cb){
+  var maxDim = 900, quality = 0.82;
+  var img = new Image();
+  img.onload = function(){
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h){ cb(dataUrl); return; }
+    if (w > maxDim || h > maxDim){
+      var scale = Math.min(maxDim / w, maxDim / h);
+      w = Math.max(1, Math.round(w * scale));
+      h = Math.max(1, Math.round(h * scale));
+    }
+    var canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    try {
+      cb(canvas.toDataURL("image/jpeg", quality));
+    } catch(e){
+      cb(dataUrl);
+    }
+  };
+  img.onerror = function(){ cb(dataUrl); };
+  img.src = dataUrl;
+}
+
 function wrapImageForResize(img){
   if (img.parentNode && img.parentNode.classList && img.parentNode.classList.contains("imgResizeWrap")){
     return img.parentNode;
@@ -1222,9 +1251,11 @@ editable.addEventListener("paste", function(e){
         if (!blob) continue;
         var reader = new FileReader();
         reader.onload = function(ev){
-          editable.focus();
-          document.execCommand("insertHTML", false, '<img src="' + ev.target.result + '">');
-          persist();
+          downscalePastedImage(ev.target.result, function(finalDataUrl){
+            editable.focus();
+            document.execCommand("insertHTML", false, '<img src="' + finalDataUrl + '">');
+            persist();
+          });
         };
         reader.readAsDataURL(blob);
         return;
