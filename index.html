@@ -307,6 +307,19 @@ background: #1f8f7d; border: 2px solid #fff; border-radius: 4px; cursor: nwse-re
 .richEditable table { border-collapse: collapse; margin: 8px 0; }
 .richEditable table td, .richEditable table th { border: 1px solid #c9c2ac; padding: 6px 10px; min-width: 40px; }
 .richEditable:empty:before { content: attr(data-placeholder); color: #a89f8c; pointer-events: none; }
+.animWord { display: inline-block; }
+@keyframes animBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.anim-bounce { animation: animBounce 0.9s ease-in-out infinite; }
+@keyframes animWiggle { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+.anim-wiggle { animation: animWiggle 0.6s ease-in-out infinite; }
+@keyframes animPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+.anim-pulse { animation: animPulse 1s ease-in-out infinite; }
+@keyframes animShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+.anim-shake { animation: animShake 0.5s ease-in-out infinite; }
+@keyframes animRainbow { 0% { color: #e6194b; } 16% { color: #f58231; } 33% { color: #ffd700; } 50% { color: #3cb44b; } 66% { color: #4363d8; } 83% { color: #911eb4; } 100% { color: #e6194b; } }
+.anim-rainbow { animation: animRainbow 3s linear infinite; }
+@keyframes animGlow { 0%,100% { text-shadow: 0 0 2px rgba(31,143,125,0.3); } 50% { text-shadow: 0 0 10px rgba(31,143,125,0.9), 0 0 16px rgba(31,143,125,0.6); } }
+.anim-glow { animation: animGlow 1.2s ease-in-out infinite; }
 .richBtnWide {
 height: 26px; padding: 0 8px; border: 1px solid #c9c2ac; border-radius: 5px; background: #fff;
 color: #4a4030; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
@@ -1157,6 +1170,40 @@ function wrapImageForResize(img){
   return wrapEl;
 }
 
+var ANIM_WORD_CLASSES = ["anim-bounce","anim-wiggle","anim-pulse","anim-shake","anim-rainbow","anim-glow"];
+function toggleAnimateSelection(editable){
+  var sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) return;
+  var range = sel.getRangeAt(0);
+
+  var container = range.commonAncestorContainer;
+  var node = container.nodeType === 3 ? container.parentNode : container;
+  var existing = node.closest ? node.closest(".animWord") : null;
+  if (existing && editable.contains(existing)){
+    var textNode = document.createTextNode(existing.textContent);
+    existing.parentNode.replaceChild(textNode, existing);
+    var restoreRange = document.createRange();
+    restoreRange.selectNodeContents(textNode);
+    sel.removeAllRanges();
+    sel.addRange(restoreRange);
+    return;
+  }
+
+  var span = document.createElement("span");
+  span.className = "animWord " + ANIM_WORD_CLASSES[Math.floor(Math.random()*ANIM_WORD_CLASSES.length)];
+  try {
+    range.surroundContents(span);
+  } catch(e){
+    var content = range.extractContents();
+    span.appendChild(content);
+    range.insertNode(span);
+  }
+  var newRange = document.createRange();
+  newRange.selectNodeContents(span);
+  sel.removeAllRanges();
+  sel.addRange(newRange);
+}
+
 function buildRichEditor(w, field, placeholder, extraClass){
 var wrap = document.createElement("div");
 wrap.className = "richWrap" + (extraClass ? " " + extraClass : "");
@@ -1164,6 +1211,7 @@ wrap.innerHTML =
   '<div class="richToolbar">' +
     '<button type="button" class="richBtn richBoldBtn" title="Bold"><b>B</b></button>' +
     '<button type="button" class="richBtn richUnderlineBtn" title="Underline"><u>U</u></button>' +
+    '<button type="button" class="richBtn richAnimateBtn" title="Animate selected text (click again to remove)">&#10024;</button>' +
     '<select class="richSizeSelect" title="Font size">' +
       '<option value="2">Small</option>' +
       '<option value="3" selected>Normal</option>' +
@@ -1189,6 +1237,7 @@ function persist(){ w[field] = editable.innerHTML; saveState(); }
 
 wrap.querySelector(".richBoldBtn").onclick = function(){ editable.focus(); document.execCommand("bold"); persist(); };
 wrap.querySelector(".richUnderlineBtn").onclick = function(){ editable.focus(); document.execCommand("underline"); persist(); };
+wrap.querySelector(".richAnimateBtn").onclick = function(){ editable.focus(); toggleAnimateSelection(editable); persist(); };
 wrap.querySelector(".richSizeSelect").onchange = function(e){ editable.focus(); document.execCommand("fontSize", false, e.target.value); persist(); };
 wrap.querySelector(".richColor").oninput = function(e){ editable.focus(); document.execCommand("foreColor", false, e.target.value); persist(); };
 wrap.querySelector(".richTableBtn").onclick = function(){
