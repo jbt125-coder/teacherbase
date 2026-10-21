@@ -3592,9 +3592,9 @@ function drawLedges(plats){
       continue;
     }
     ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, w + 2, 5);
-    ctx.fillStyle = '#c88848'; ctx.fillRect(x, y, w, 3);
-    ctx.fillStyle = '#f0c078'; ctx.fillRect(x, y, w, 1);
-    ctx.fillStyle = '#805020';
+    ctx.fillStyle = q.ledge ? '#a0a8c8' : '#c88848'; ctx.fillRect(x, y, w, 3);
+    ctx.fillStyle = q.ledge ? '#e0e8fc' : '#f0c078'; ctx.fillRect(x, y, w, 1);
+    ctx.fillStyle = q.ledge ? '#6870a0' : '#805020';
     for (let i = x + 3; i < x + w - 1; i += 8) ctx.fillRect(i, y + 1, 1, 2);
   }
 }
@@ -3679,7 +3679,14 @@ function drawArrows(arrows){
 function HoopsGame(){
   const BR = 4, G = 230, ANG = 60 * Math.PI / 180, RIM_W = 19;
   let t = 0, left = 60, made = 0, netT = 0, meter = null, rimSnd = 0, birdT = rand(5, 8), birds = [], hoop = null, moveT = 0, noBallT = 0;
-  let plats = getPlats();
+  // stone ledges up both sides of the screen: one jump reaches the next, so you can climb up level with the hoop
+  const sideLedges = [];
+  for (let y = H - 3 - 32, i = 0; y > 26; y -= 32, i++) {
+    sideLedges.push({ x1: 0, x2: 34, y, id: 'ledgeL' + i, ledge: true });
+    sideLedges.push({ x1: W - 34, x2: W, y, id: 'ledgeR' + i, ledge: true });
+  }
+  const allPlats = () => getPlats().concat(sideLedges);
+  let plats = allPlats();
   const p = newHero();
   const balls = BALL_STYLES.map((s, i) => ({ img: s.img, x: 40 + i * 16, y: H - 3 - BR, vx: 0, vy: 0, rot: 0, free: true, live: false, noPick: 0, rest: 0 }));
   p.ball = balls[0]; balls[0].free = false;
@@ -3687,7 +3694,7 @@ function HoopsGame(){
   const hoopX = () => (hoop.rl + hoop.rr) / 2;
 
   function placeHoop(){
-    const cands = plats.filter(q => !q.floor && q.x2 - q.x1 >= 40 && q.y - 34 > 16 && (!hoop || q.id !== hoop.plat));
+    const cands = plats.filter(q => !q.floor && !q.ledge && q.x2 - q.x1 >= 40 && q.y - 34 > 16 && (!hoop || q.id !== hoop.plat));
     let q = cands.length ? pick(cands) : null, side, rimY, bx;
     if (q) { side = (q.x1 + q.x2) / 2 > W / 2 ? 1 : -1; rimY = q.y - 30; bx = side > 0 ? Math.round(q.x2 - 6) : Math.round(q.x1 + 3); }
     else { q = plats[0]; side = 1; rimY = H - 3 - 46; bx = W - 10; }
@@ -3767,12 +3774,12 @@ function HoopsGame(){
 
   const api = {
     title: 'HOOPS',
-    how: '◀ ▶ run &nbsp; ▲ jump (again in the air = double jump)<br>Hold SPACE, let go to shoot &nbsp; ▼ drop off a window<br>Jump shots +50, long shots +50 — the hoop moves after every basket!',
+    how: '◀ ▶ run &nbsp; ▲ jump (again in the air = double jump)<br>Hold SPACE, let go to shoot &nbsp; ▼ drop off a window<br>Climb the side ledges to get up high! Jump shots +50, long shots +50',
     status: () => 'TIME ' + fmt(left) + '  BASKETS ' + made,
     clearText: "TIME'S UP!",
     update(dt){
       t += dt; left -= dt; netT = Math.max(0, netT - dt); rimSnd -= dt;
-      plats = getPlats();
+      plats = allPlats();
       stepHero(p, dt, plats, meter && !air());
       if (meter) {
         meter.p += meter.dir * dt / (air() ? .55 : 1.4);
