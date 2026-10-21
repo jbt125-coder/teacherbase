@@ -361,14 +361,6 @@ padding: 8px 4px; cursor: pointer; text-align: center;
 .arcadeGameBtn .name { font-size: 9px; margin-top: 4px; text-shadow: 2px 2px 0 #000; }
 .arcadeGameBtn .where { font-size: 6px; color: #fcd8a8; margin-top: 5px; }
 .arcadeGameBtn .best { font-size: 7px; color: #f8b800; margin-top: 5px; text-shadow: 1px 1px 0 #000; }
-.arcadeLabel { font-size: 8px; color: #cfcfcf; }
-.arcadeChars { display: flex; flex-wrap: wrap; gap: 4px; }
-.arcadeCharBtn {
-width: 30px; height: 30px; background: #bdbdbd; border: 3px solid #000; box-shadow: inset -2px -2px 0 #8e8e8e;
-font-size: 15px; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-.arcadeCharBtn img { width: 12px; height: 18px; image-rendering: pixelated; }
-.arcadeCharBtn.active { outline: 3px solid #f8b800; outline-offset: 1px; }
 .arcadeChip {
 align-self: flex-start; font-family: inherit; font-size: 8px; padding: 8px 10px; background: #bdbdbd; color: #000;
 border: 3px solid #000; box-shadow: inset -3px -3px 0 #8e8e8e; cursor: pointer;
@@ -905,7 +897,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
   }
 
   function renderWindow(w){
-    if (w.closed || w.sentAway) return;
+    if (w.closed || w.sentAway || arcadeHiddenWinId === w.id) return;
     if (w.type === "pointer"){ renderPointer(w); return; }
 
     var el = document.createElement("div");
@@ -3284,7 +3276,7 @@ var id = type + "_" + Date.now();
 Z += 1;
 var sizeDefaults = {
   note:{w:260,h:200}, clock:{w:240,h:190}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320},
-  bellwork:{w:480,h:420}, timer:{w:260,h:220}, signin:{w:260,h:260}, answers:{w:300,h:260}, annotation:{w:400,h:300}, pointer:{w:110,h:110}, arcade:{w:360,h:520}
+  bellwork:{w:480,h:420}, timer:{w:260,h:220}, signin:{w:260,h:260}, answers:{w:300,h:260}, annotation:{w:400,h:300}, pointer:{w:110,h:110}, arcade:{w:360,h:430}
 };
 var sz = sizeDefaults[type] || {w:260,h:200};
 var w = { id:id, type:type, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: sz.w, h: sz.h, z: Z, closed:false, sentAway:false };
@@ -3296,7 +3288,7 @@ if (type === "bellwork") w.content = "";
 if (type === "timer"){ w.seconds = 600; w.remaining = 600; w.running = false; }
 if (type === "signin") w.roster = [];
 if (type === "answers") w.feed = [];
-if (type === "arcade"){ w.character = "kid"; w.highScores = {}; }
+if (type === "arcade") w.highScores = {};
 if (type === "pointer"){ w.text = "Do This!!!"; w.shape = "arrow"; w.dir = -45; w.size = 1; w.animate = true; }
 if (type === "annotation"){ w.penColor = "#ff0000"; w.strokeWidth = 5; w.eraseMode = false; w.drawingData = ""; }
 state.windows.push(w);
@@ -3348,7 +3340,7 @@ var RetroArcade = (function(){
 'use strict';
 let W = 256, H = 144, ctx = null;
 let state = 'play', level = 1, score = 0, parts = [], popups = [], soundOn = true;
-let heroCh = null, topsFn = null, stageBox = null;
+let topsFn = null, stageBox = null;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -3656,12 +3648,6 @@ function drawHero(p){
   if (p.inv > 0 && Math.floor(p.inv * 14) % 2) return;
   const x = Math.round(p.x), y = Math.round(p.y);
   const spin = p.flipT > 0 ? -p.face * (1 - p.flipT / .3) * Math.PI * 2 : 0;
-  if (heroCh) {
-    ctx.font = '13px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
-    ctx.save(); ctx.translate(x, y - 6); ctx.rotate(spin); ctx.fillText(heroCh, 0, 0); ctx.restore();
-    return;
-  }
   const s = !p.ground ? SP.walk1 : (p.vx && Math.floor(p.anim) % 2 ? SP.walk1 : p.vx ? SP.walk2 : SP.stand);
   const img = p.face < 0 ? s.l : s.r;
   if (spin) { ctx.save(); ctx.translate(x, y - 6); ctx.rotate(spin); ctx.drawImage(img, -4, -6); ctx.restore(); }
@@ -3851,7 +3837,7 @@ function HoopsGame(){
       }
       drawHero(p);
       const ox = Math.round(p.x - 4), oy = Math.round(p.y - 12);
-      if (!heroCh && (meter || (air() && p.ball))) { ctx.fillStyle = PAL.s; ctx.fillRect(ox + 1, oy - 4, 1, 6); ctx.fillRect(ox + 6, oy - 4, 1, 6); }
+      if (meter || (air() && p.ball)) { ctx.fillStyle = PAL.s; ctx.fillRect(ox + 1, oy - 4, 1, 6); ctx.fillRect(ox + 6, oy - 4, 1, 6); }
       if (meter) {
         const mx = ox - 7, my = oy - 18;
         ctx.fillStyle = '#000'; ctx.fillRect(mx - 1, my - 1, 5, 22);
@@ -4061,12 +4047,6 @@ function CoinGame(){
    (waves of 5, 10 and 15 bugs, then a boss bug, then a bonus round)
    ===================================================================== */
 function drawShip(x, y, t){
-  if (heroCh) {
-    ctx.font = '11px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
-    ctx.fillText(heroCh, x + 4, y + 3);
-    return;
-  }
   ctx.drawImage(SP.ship, x, y);
   if (Math.floor(t * 20) % 2) { ctx.fillStyle = '#f87800'; ctx.fillRect(x + 4, y + 7, 1, 2); ctx.fillStyle = '#f8d800'; ctx.fillRect(x + 3, y + 7, 3, 1); }
 }
@@ -4477,7 +4457,6 @@ const GAME_MAKERS = { hoops: HoopsGame, squish: SquishGame, coins: CoinGame, bug
 
 function start(o){
   soundOn = o.sound !== false;
-  heroCh = o.hero || null;
   topsFn = o.tops || null;
   level = 1;
   for (const k in keys) keys[k] = false;
@@ -4624,15 +4603,7 @@ function start(o){
   };
 }
 
-// a picture of the pixel kid for the player picker
-function kidIcon(){
-  const c = document.createElement('canvas'); c.width = 24; c.height = 36;
-  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-  x.drawImage(SP.stand.r, 0, 0, 24, 36);
-  return c.toDataURL();
-}
-
-return { start, kidIcon };
+return { start };
 })();
 
 var ARCADE_GAMES = [
@@ -4643,6 +4614,7 @@ var ARCADE_GAMES = [
 ];
 var ARCADE_KEYS = ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space","Enter"];
 var arcadeBlasterWinId = null;
+var arcadeHiddenWinId = null; // the Arcade window steps out of the way while a game covers the board
 var arcadeGame = null; // the one running game: { key(code, down), stop(), box? }
 
 function arcadeKeyName(e){ return e.key === " " ? "Space" : e.key; }
@@ -4682,10 +4654,8 @@ function arcadeStop(){
 function arcadeStart(w, gameId){
   arcadeStop();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  var shape = w.character && w.character !== "kid" ? getPointerShape(w.character) : null;
   var opts = {
     gameId: gameId,
-    hero: shape && shape.emoji ? shape.emoji : null,
     sound: w.arcadeSound !== false,
     best: function(){ return (w.highScores && w.highScores[gameId]) || 0; },
     save: function(s){ return arcadeSaveScore(w, gameId, s); },
@@ -4693,11 +4663,13 @@ function arcadeStart(w, gameId){
     gone: function(){ arcadeStop(); }
   };
   if (gameId === "bugs") startArcadeInWindow(w, opts);
-  else startArcadeOnBoard(opts);
+  else startArcadeOnBoard(w, opts);
 }
 
 // Hoops, Bug Squish and Coin Hop cover the board and use the window tops as ledges
-function startArcadeOnBoard(opts){
+function startArcadeOnBoard(w, opts){
+  arcadeHiddenWinId = w.id;
+  renderAll();
   var area = document.getElementById("canvas");
   var overlay = document.createElement("div");
   overlay.className = "arcadeOverlay";
@@ -4726,6 +4698,7 @@ function startArcadeOnBoard(opts){
       h.stop();
       window.removeEventListener("resize", fit);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      arcadeHiddenWinId = null;
       renderAll();
     }
   };
@@ -4812,36 +4785,6 @@ function buildArcadeBody(w){
   }
   menu.appendChild(games);
 
-  var lbl = document.createElement("div");
-  lbl.className = "arcadeLabel";
-  lbl.textContent = "PLAYER";
-  menu.appendChild(lbl);
-  var chars = document.createElement("div");
-  chars.className = "arcadeChars";
-  var current = w.character || "kid";
-  function addChar(id, title, inner){
-    var cb = document.createElement("button");
-    cb.type = "button";
-    cb.className = "arcadeCharBtn" + (current === id ? " active" : "");
-    cb.title = title;
-    cb.innerHTML = inner;
-    cb.onclick = function(){
-      w.character = id;
-      saveState();
-      var prev = chars.querySelector(".active");
-      if (prev) prev.classList.remove("active");
-      cb.classList.add("active");
-    };
-    chars.appendChild(cb);
-  }
-  addChar("kid", "Clean Screen kid", '<img src="' + RetroArcade.kidIcon() + '" alt="">');
-  for (var g=0;g<POINTER_SHAPE_GROUPS.length;g++){
-    var items = POINTER_SHAPE_GROUPS[g].items;
-    for (var j=0;j<items.length;j++){
-      if (items[j].emoji) addChar(items[j].id, items[j].name, items[j].emoji);
-    }
-  }
-  menu.appendChild(chars);
 
   var snd = document.createElement("button");
   snd.type = "button";
