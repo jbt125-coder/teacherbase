@@ -375,6 +375,11 @@ border: 3px solid #000; box-shadow: inset -3px -3px 0 #8e8e8e; cursor: pointer;
 }
 .arcadeChip:active { box-shadow: inset 3px 3px 0 #8e8e8e; }
 .arcadeKeys { font-size: 7px; line-height: 2; color: #cfcfcf; }
+.arcadePadHelp { display: none; color: #7dffb0; margin-top: 4px; }
+.arcadePadHint { color: #8fd0ff; margin-top: 4px; }
+body.hasGamepad .arcadePadHelp { display: block; }
+body.hasGamepad .arcadePadHint { display: none; }
+.arcadeGameBtn.padSel { outline: 3px solid #f8b800; outline-offset: 2px; }
 .win.arcadeClear { background: transparent !important; box-shadow: 0 0 0 2px rgba(248,184,0,0.7), 0 6px 20px rgba(0,0,0,0.25) !important; }
 .win.arcadeClear .winBody { overflow: hidden; }
 .arcadeSlot { position: absolute; inset: 0; }
@@ -4461,6 +4466,7 @@ function BugsGame(){
       if (bannerT > 0 && state === 'play') txt(banner, W / 2, H / 2 - 6, phase === 'over' ? '#f86060' : '#fcfc78', 12);
       if (phase === 'over' && bannerT > 0 && bannerT < 1.6) txt('TRY AGAIN!', W / 2, H / 2 + 10, '#fcfcfc');
     },
+    padA: 'Space',
     press(k){ if (k === 'Space') fire(); }
   };
   return api;
@@ -4528,6 +4534,7 @@ function start(o){
     if (stopped) return;
     if (!box.isConnected) { if (o.gone) o.gone(); return; }
     const dt = Math.min(.05, (now - last) / 1000); last = now;
+    pollPad();
     if (state === 'play') {
       game.update(dt); stepFx(dt);
       if (game.done) { state = 'clear'; clearT = 1.8; }
@@ -4552,6 +4559,40 @@ function start(o){
     const s = game && state !== 'intro' ? game.status() : '';
     if (s !== lastStatus) { hudStatus.textContent = s; lastStatus = s; }
     raf = requestAnimationFrame(frame);
+  }
+
+  // Bluetooth / USB controller (Gamepad API, standard mapping), fed in as the same keys as the keyboard
+  let padPrev = {}, aMap = null, padPrimed = false;
+  function pollPad(){
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    let g = null; for (const x of list) if (x && x.connected !== false) { g = x; break; }
+    const now = {};
+    if (g) {
+      const b = i => !!(g.buttons[i] && g.buttons[i].pressed);
+      const ax = g.axes[0] || 0, ay = g.axes[1] || 0;
+      now.ArrowLeft = b(14) || ax < -.5; now.ArrowRight = b(15) || ax > .5;
+      now.ArrowUp = b(12) || ay < -.5; now.ArrowDown = b(13) || ay > .5;
+      now.Space = b(1) || b(2);
+      now.Enter = b(9);
+      now.Select = b(8);
+      // A jumps (fires in Space Bugs) during play, and picks the highlighted button on a title or results screen
+      if (b(0) && !aMap) aMap = panelBtns.length ? 'Enter' : (game && game.padA) || 'ArrowUp';
+      if (!b(0)) aMap = null;
+      if (aMap) now[aMap] = true;
+    }
+    if (!padPrimed) {                                   // buttons already held when the game opened (like the A that launched it) don't count
+      padPrimed = true; padPrev = now;
+      if (aMap) aMap = 'Held';
+      return;
+    }
+    for (const k of new Set(Object.keys(now).concat(Object.keys(padPrev)))) {
+      const on = !!now[k];
+      if (on === !!padPrev[k]) continue;
+      if (k === 'Held') continue;
+      if (k === 'Select') { if (on) o.quit(); continue; }
+      key(k, on);
+    }
+    padPrev = now;
   }
 
   function key(k, down){
@@ -4715,6 +4756,35 @@ function startArcadeInWindow(w, opts){
   };
 }
 
+// With a controller, the D-pad moves a highlight between the Arcade menu's games and A or Start launches one
+var arcadePadIdx = 0, arcadePadPrev = {}, arcadePadLoopOn = false;
+function arcadePadLoop(){
+  var list = navigator.getGamepads ? navigator.getGamepads() : [], g = null;
+  for (var i=0;i<list.length;i++){ if (list[i] && list[i].connected !== false){ g = list[i]; break; } }
+  document.body.classList.toggle("hasGamepad", !!g);
+  if (!g){ arcadePadLoopOn = false; return; }
+  var b = function(i){ return !!(g.buttons[i] && g.buttons[i].pressed); };
+  var ax = g.axes[0] || 0, ay = g.axes[1] || 0;
+  var now = { l: b(14) || ax < -.5, r: b(15) || ax > .5, u: b(12) || ay < -.5, d: b(13) || ay > .5, go: b(0) || b(9) };
+  var menus = document.querySelectorAll(".arcadeMenu");
+  if (!arcadeGame && menus.length){
+    var btns = menus[menus.length - 1].querySelectorAll(".arcadeGameBtn");
+    var mv = 0;
+    if (now.l && !arcadePadPrev.l) mv = -1;
+    if (now.r && !arcadePadPrev.r) mv = 1;
+    if (now.u && !arcadePadPrev.u) mv = -2;
+    if (now.d && !arcadePadPrev.d) mv = 2;
+    arcadePadIdx = (arcadePadIdx + mv + btns.length * 4) % btns.length;
+    for (var j=0;j<btns.length;j++) btns[j].classList.toggle("padSel", j === arcadePadIdx);
+    if (now.go && !arcadePadPrev.go && btns[arcadePadIdx]){ arcadePadPrev = now; btns[arcadePadIdx].click(); requestAnimationFrame(arcadePadLoop); return; }
+  }
+  arcadePadPrev = now;
+  requestAnimationFrame(arcadePadLoop);
+}
+function startArcadePadLoop(){ if (!arcadePadLoopOn){ arcadePadLoopOn = true; requestAnimationFrame(arcadePadLoop); } }
+window.addEventListener("gamepadconnected", startArcadePadLoop);
+window.addEventListener("gamepaddisconnected", startArcadePadLoop);
+
 function buildArcadeBody(w){
   if (arcadeBlasterWinId === w.id){
     var slot = document.createElement("div");
@@ -4786,7 +4856,9 @@ function buildArcadeBody(w){
 
   var keys = document.createElement("div");
   keys.className = "arcadeKeys";
-  keys.innerHTML = "◀ ▶ MOVE &nbsp; ▲ JUMP (TWICE = DOUBLE JUMP)<br>▼ DROP OFF A WINDOW &nbsp; SPACE SHOOT<br>ESC QUIT";
+  keys.innerHTML = "◀ ▶ MOVE &nbsp; ▲ JUMP (TWICE = DOUBLE JUMP)<br>▼ DROP OFF A WINDOW &nbsp; SPACE SHOOT<br>ESC QUIT" +
+    '<div class="arcadePadHelp">\uD83C\uDFAE CONTROLLER: D-PAD MOVE &nbsp; A JUMP<br>B SHOOT &nbsp; START GO &nbsp; SELECT QUIT</div>' +
+    '<div class="arcadePadHint">\uD83C\uDFAE HAVE A CONTROLLER? PRESS ANY BUTTON ON IT TO CONNECT</div>';
   menu.appendChild(keys);
   return menu;
 }
