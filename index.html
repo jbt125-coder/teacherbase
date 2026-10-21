@@ -3681,11 +3681,16 @@ function HoopsGame(){
   let t = 0, left = 60, made = 0, netT = 0, meter = null, rimSnd = 0, birdT = rand(5, 8), birds = [], hoop = null, moveT = 0, noBallT = 0;
   // stone ledges up both sides of the screen: one jump reaches the next, so you can climb up level with the hoop
   const sideLedges = [];
-  for (let y = H - 3 - 32, i = 0; y > 26; y -= 32, i++) {
-    sideLedges.push({ x1: 0, x2: 34, y, id: 'ledgeL' + i, ledge: true });
-    sideLedges.push({ x1: W - 34, x2: W, y, id: 'ledgeR' + i, ledge: true });
+  for (let y = H - 3 - 46, i = 0; y > 26; y -= 46, i++) {
+    sideLedges.push({ x1: 0, x2: 18, y, id: 'ledgeL' + i, ledge: true });
+    sideLedges.push({ x1: W - 18, x2: W, y, id: 'ledgeR' + i, ledge: true });
   }
-  const allPlats = () => getPlats().concat(sideLedges);
+  // a ledge never sits in front of, under or over the hoop (rim, net, board, pole, or the space the ball drops through)
+  const blocksHoop = q => {
+    const x1 = Math.min(hoop.rl, hoop.bx) - 8, x2 = Math.max(hoop.rr, hoop.bx + 4) + 8;
+    return q.x2 > x1 && q.x1 < x2 && q.y > hoop.y - 44 && q.y < hoop.base + 4;
+  };
+  const allPlats = () => getPlats().concat(hoop ? sideLedges.filter(q => !blocksHoop(q)) : sideLedges);
   let plats = allPlats();
   const p = newHero();
   const balls = BALL_STYLES.map((s, i) => ({ img: s.img, x: 40 + i * 16, y: H - 3 - BR, vx: 0, vy: 0, rot: 0, free: true, live: false, noPick: 0, rest: 0 }));
