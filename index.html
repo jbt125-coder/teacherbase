@@ -451,6 +451,10 @@ box-shadow: inset -3px -3px 0 #8a1800; cursor: pointer;
 }
 .raPanel button.sm { font-size: .8em; padding: .6em .8em; background: #bdbdbd; color: #000; box-shadow: inset -3px -3px 0 #8e8e8e; }
 .raPanel button.sel { outline: 3px solid #f8b800; outline-offset: 2px; }
+.raWord {
+font-family: inherit; font-size: 1.6em; text-align: center; letter-spacing: .2em; width: 12em; max-width: 90%; padding: .4em;
+background: #fcfcfc; color: #000; border: 3px solid #000; box-shadow: inset -3px -3px 0 #bdbdbd; text-transform: uppercase;
+}
 
 /* ––––– Pointer arrow (floats above every window) ––––– */
 .ptrEl { position: absolute; z-index: 999; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
@@ -3664,7 +3668,12 @@ function stepHero(p, dt, plats, lock){
   p.flipT = Math.max(0, p.flipT - dt); p.drop = Math.max(0, p.drop - dt);
   p.inv = Math.max(0, p.inv - dt); p.hurtT = Math.max(0, p.hurtT - dt); p.shootT -= dt;
   const mv = lock ? 0 : held('left') ? -1 : held('right') ? 1 : 0;
-  if (p.hurtT <= 0) { p.vx = mv * RUN; if (mv) p.face = mv; }
+  const onIce = p.ground && (plats.find(q => q.id === p.ground) || {}).ice;
+  if (p.hurtT <= 0) {
+    if (onIce) p.vx += (mv * RUN - p.vx) * Math.min(1, dt * 1.5);      // ice: slow to start, slides when you stop
+    else p.vx = mv * RUN;
+    if (mv) p.face = mv;
+  }
   if (p.ground && p.vx) p.anim += dt * 10;
   p.x = clamp(p.x + p.vx * dt, 4, W - 4);
   if (p.ground) {
@@ -3711,9 +3720,9 @@ function drawHero(p){
   if (spin) { ctx.save(); ctx.translate(x, y - 6); ctx.rotate(spin); ctx.drawImage(img, -4, -6); ctx.restore(); }
   else ctx.drawImage(img, x - 4, y - 12);
 }
-function shootArrow(p, arrows){
+function shootArrow(p, arrows, upOnly){
   if (arrows.length >= 3 || p.shootT > 0) return;
-  const up = held('up');
+  const up = upOnly || held('up');
   arrows.push(up ? { x: p.x, y: p.y - 14, vx: 0, vy: -230, life: .6, up: true }
                  : { x: p.x + p.face * 5, y: p.y - 7, vx: p.face * 230, vy: 0, life: .6 });
   p.shootT = .25; tone(1200, .06, 'square', .03, -600);
@@ -4042,14 +4051,14 @@ function SquishGame(){
   }
   const api = {
     title: 'BUG SQUISH',
-    how: '◀ ▶ run &nbsp; ▲ jump (again in the air = double jump)<br>Land on a bug +50 &nbsp; SPACE shoot +25 (hold ▲ to shoot up)<br>Get them before they chew holes in your windows!',
+    how: '◀ ▶ run &nbsp; ▲ jump (again in the air = double jump)<br>Jump on crawling bugs to squish them +50<br>SPACE shoots straight up at flying bugs +25<br>Get them before they chew holes in your windows!',
     status: () => 'TIME ' + fmt(left) + '  SQUISHED ' + squished,
     clearText: "TIME'S UP!",
     update(dt){
       t += dt; left -= dt;
       plats = getPlats();
       stepHero(p, dt, plats, false);
-      if (btn.a && p.shootT <= 0) shootArrow(p, arrows);
+      if (btn.a && p.shootT <= 0) shootArrow(p, arrows, true);
       arrows = stepArrows(arrows, dt);
       spawnT -= dt;
       if (spawnT <= 0 && bugs.length < 10) { spawnBug(); spawnT = Math.max(.6, 1.6 - (60 - left) * .015); }
@@ -4088,7 +4097,8 @@ function SquishGame(){
           if (b.y < -14) b.dead = true;
         }
         if (b.dead || b.mode === 'leave') continue;
-        for (const a of arrows) if (a.life > 0 && Math.abs(a.x - b.x) < hw + 1 && Math.abs(a.y - b.y) < hh + 2) { a.life = 0; squish(b, 25); break; }
+        // arrows only hit flying bugs; crawling ones have to be stomped
+        if (b.fly) for (const a of arrows) if (a.life > 0 && Math.abs(a.x - b.x) < hw + 1 && Math.abs(a.y - b.y) < hh + 2) { a.life = 0; squish(b, 25); break; }
         if (b.dead) continue;
         if (heroHit(p, b.x, b.y, hw - 1, hh)) {
           if (p.vy > 0 && p.y - (b.y - hh) < 6) {
@@ -4109,55 +4119,144 @@ function SquishGame(){
       drawArrows(arrows);
       drawHero(p);
     },
-    press(k){ heroKey(p, k); if (k === 'Space') shootArrow(p, arrows); },
+    press(k){ heroKey(p, k); if (k === 'Space') shootArrow(p, arrows, true); },
     release(k){ heroRelease(p, k); }
   };
   return api;
 }
 
 /* =====================================================================
-   COIN HOP — grab coins on your windows, dodge (or shoot) the bats
+   COIN HOP — climb floating platforms to spell the word of the day,
+   grab coins for time, and dodge bats, birds, ants and scorpions
    ===================================================================== */
+const COIN_SP = (() => {
+  const two = (a, b, pal) => [makeSpriteP(a, pal), makeSpriteP(b, pal)].map(c => ({ r: c, l: flip(c) }));
+  const antPal = { B: '#b02818', D: '#601008', E: '#fcfcfc' };
+  const scPal = { B: '#d8a020', T: '#a87010', P: '#c08818', D: '#604008', E: '#000000', S: '#f83800' };
+  return {
+    ant: two([".......D.D", ".BB..BB.BB", "BBBBBBBBEB", ".D.D.D....", "D...D...D."],
+             [".......D.D", ".BB..BB.BB", "BBBBBBBBEB", "..D.D.D...", ".D..D..D.."], antPal),
+    scorpion: two([".ST..........", "T..T.........", "...TT........", "....BBBBB.P.P", "...BBBBBBBPPP", "..BBBBBBBBBE.", ".D.D.D.D.....", "D.D.D.D......"],
+                  [".ST..........", "T..T.........", "...TT........", "....BBBBB.P.P", "...BBBBBBBPPP", "..BBBBBBBBBE.", "D.D.D.D......", ".D.D.D.D....."], scPal)
+  };
+})();
+const FLOATER_KINDS = {
+  grow:   { top: '#58d830', body: '#2c8c18', dark: '#145010' },
+  shrink: { top: '#f8b860', body: '#f87800', dark: '#803800' },
+  rise:   { top: '#e080f8', body: '#a040e0', dark: '#502078' },
+  ice:    { top: '#ffffff', body: '#9cd8fc', dark: '#3878b8' }
+};
 function CoinGame(){
-  let t = 0, left = 60, got = 0, coins = [], bats = [], arrows = [], heart = null, heartT = rand(6, 9), batT = 4;
-  let plats = getPlats();
+  const FLOOR = () => H - 3;
+  let t = 0, left = 60, got = 0, hearts = 3, coins = [], bats = [], birds = [], poops = [], splats = [], arrows = [];
+  let heart = null, heartT = rand(8, 12), batT = 6, birdT = rand(4, 7), floatT = .3, groundT = 5;
+  let floaters = [], floatId = 0, crawlers = [], blobs = [];
+  let word = '', li = 0, letter = null, spelled = 0;
+  let base = getPlats(), plats = base;
   const p = newHero();
+
   function addCoins(){
-    const ok = plats.filter(q => q.x2 - q.x1 >= 24);
+    const ok = base.filter(q => q.x2 - q.x1 >= 24);
     const q = ok.length > 1 && Math.random() < .75 ? pick(ok.filter(q => !q.floor)) : pick(ok);
     const n = 1 + Math.floor(Math.random() * 3), cx = rand(q.x1 + 12, q.x2 - 12), lift = Math.random() < .4 ? rand(10, 26) : 0;
     for (let i = 0; i < n; i++) coins.push({ x: clamp(cx + (i - (n - 1) / 2) * 8, 4, W - 4), y: Math.max(20, q.y - 7 - lift), t: rand(0, 2) });
   }
-  function spot(){
-    const q = pick(plats);
-    return { x: rand(q.x1 + 8, q.x2 - 8), y: Math.max(20, q.y - 9) };
+  // letters always sit high: out of reach of a jump or double jump from the floor
+  function placeLetter(){
+    if (!word) { letter = null; return; }
+    letter = { ch: word[li], x: rand(20, W - 20), y: rand(28, Math.max(30, FLOOR() - 100)), t: 0 };
+    burst(letter.x, letter.y, 10, ['#f8d800', '#fcfcfc'], 50);
   }
+  // temporary platforms; most of them show up on the way to the next letter
+  function spawnFloater(){
+    const kind = pick(Object.keys(FLOATER_KINDS)), w = kind === 'grow' ? 12 : kind === 'shrink' ? 44 : rand(26, 38);
+    let cx = rand(20, W - 20), y = rand(H * .35, FLOOR() - 36);
+    const r = Math.random();
+    if (letter && r < .4) { cx = letter.x + rand(-30, 30); y = letter.y + rand(24, 38); }
+    else if (letter && r < .7) { cx = letter.x + rand(-60, 60); y = (letter.y + FLOOR()) / 2 + rand(-10, 10); }
+    cx = clamp(cx, w / 2 + 2, W - w / 2 - 2);
+    const life = rand(5.5, 7);
+    floaters.push({ id: 'float' + (floatId++), kind, cx, w, y: Math.round(y), life, max: life, ice: kind === 'ice' });
+  }
+  function spawnCrawler(){
+    const scorp = t > 18 && Math.random() < .4, dir = Math.random() < .5 ? 1 : -1;
+    crawlers.push({ kind: scorp ? 'scorpion' : 'ant', x: dir > 0 ? -8 : W + 8, dir, sp: scorp ? 12 : rand(26, 34), f: 0, shootT: rand(2, 4) });
+  }
+  function loseHeart(text){
+    hearts--;
+    popups.push({ x: p.x, y: p.y - 24, text, life: 1, col: '#f86060' });
+    if (hearts <= 0 && !api.done) { api.clearText = 'OUT OF HEARTS!'; api.done = true; sfx.over(); }
+  }
+  function hit(x, text){ if (hurtHero(p, x)) loseHeart(text); }
+  function stomp(x, y, pts, label, cols){
+    addScore(pts, x, y - 6, label);
+    p.vy = -190; p.ground = null; p.air2 = true; p.jumpHeld = true;
+    burst(x, y, 12, cols, 60); sfx.squish();
+  }
+  const landing = (x, top) => p.vy > 0 && p.y - top < 5;
+
   const api = {
     title: 'COIN HOP',
-    how: '◀ ▶ run &nbsp; ▲ jump (again in the air = double jump)<br>Coins +10, hearts +50 &nbsp; SPACE shoot bats +25<br>A bat that hits you knocks 20 coins loose!',
-    status: () => 'TIME ' + fmt(left) + '  COINS ' + got,
+    wordEntry: true,
+    how: '◀ ▶ run &nbsp; ▲ jump (twice = double jump) &nbsp; SPACE shoot (hold ▲ to shoot up)<br>Ride the floating platforms up to grab the letters of the word in order!<br>Coins +10 and +1 sec. Stomp or shoot bats, ants and scorpions.<br>Shoot a bird and it attacks: stomp it for +50. Watch out for poop and poison! 3 hearts',
+    setWord(wd){ word = wd; li = 0; placeLetter(); },
+    status: () => 'TIME ' + fmt(left) + '  COINS ' + got + (word ? '  ' + word.slice(0, li) + '_'.repeat(word.length - li) : ''),
     clearText: "TIME'S UP!",
     update(dt){
       t += dt; left -= dt;
-      plats = getPlats();
+      // floating platforms grow, shrink, rise or stay put (ice), then vanish
+      floatT -= dt;
+      if (floatT <= 0 && floaters.length < 8) { spawnFloater(); floatT = rand(.9, 1.5); }
+      for (const f of floaters) {
+        f.life -= dt;
+        if (f.kind === 'grow') f.w = Math.min(48, f.w + 8 * dt);
+        if (f.kind === 'shrink') f.w = Math.max(6, f.w - 6 * dt);
+        if (f.kind === 'rise') f.y = Math.max(20, f.y - 10 * dt);
+      }
+      floaters = floaters.filter(f => f.life > 0);
+      base = getPlats();
+      plats = base.concat(floaters.map(f => ({ x1: f.cx - f.w / 2, x2: f.cx + f.w / 2, y: f.y, id: f.id, ice: f.ice })));
       stepHero(p, dt, plats, false);
       if (btn.a && p.shootT <= 0) shootArrow(p, arrows);
       arrows = stepArrows(arrows, dt);
+
       while (coins.length < 8) addCoins();
       for (const c of coins) {
         c.t += dt;
-        if (Math.abs(c.x - p.x) < 6 && Math.abs(c.y - (p.y - 6)) < 9) { c.got = true; got++; addScore(10); sfx.coin(); }
+        if (Math.abs(c.x - p.x) < 6 && Math.abs(c.y - (p.y - 6)) < 9) { c.got = true; got++; addScore(10); left += 1; sfx.coin(); }
       }
       coins = coins.filter(c => !c.got);
+
+      if (letter) {
+        letter.t += dt;
+        if (Math.abs(letter.x - p.x) < 8 && Math.abs(letter.y - (p.y - 6)) < 10) {
+          addScore(25, letter.x, letter.y - 8, letter.ch + '!');
+          burst(letter.x, letter.y, 16, ['#f8d800', '#fcfcfc', '#f87800'], 70); sfx.clean();
+          li++;
+          if (li >= word.length) {                                     // spelled it: bonus, then spell it again
+            spelled++; left += 10;
+            addScore(200, W / 2, H / 2, word + '!');
+            popups.push({ x: W / 2, y: H / 2 + 16, text: '+10 SEC', life: 1.4, col: '#58f858' });
+            sfx.bonus(); li = 0;
+          }
+          placeLetter();
+        }
+      }
+
       heartT -= dt;
-      if (!heart && heartT <= 0) { heart = spot(); heart.life = 5; }
+      if (!heart && heartT <= 0) { const q = pick(base); heart = { x: rand(q.x1 + 8, q.x2 - 8), y: Math.max(20, q.y - 9), life: 5 }; }
       if (heart) {
         heart.life -= dt;
-        if (Math.abs(heart.x - p.x) < 6 && Math.abs(heart.y - (p.y - 6)) < 9) { addScore(50, heart.x, heart.y - 6, 'BONUS!'); sfx.clean(); heart = null; heartT = rand(7, 10); }
-        else if (heart.life <= 0) { heart = null; heartT = rand(7, 10); }
+        if (Math.abs(heart.x - p.x) < 6 && Math.abs(heart.y - (p.y - 6)) < 9) {
+          if (hearts < 3) { hearts++; popups.push({ x: heart.x, y: heart.y - 8, text: '+HEART', life: 1, col: '#f86060' }); }
+          else addScore(50, heart.x, heart.y - 6, 'BONUS!');
+          sfx.clean(); heart = null; heartT = rand(9, 13);
+        } else if (heart.life <= 0) { heart = null; heartT = rand(9, 13); }
       }
+
+      // bats: hover, swoop at you; stomp or shoot them
       batT -= dt;
-      if (batT <= 0 && bats.length < 1 + Math.floor((60 - left) / 20)) {
+      if (batT <= 0 && bats.length < 1 + Math.floor(t / 20)) {
         bats.push({ x: rand(20, W - 20), y: -8, hx: rand(20, W - 20), hy: rand(24, H * .5), t: 0, f: 0, mode: 'enter' });
         batT = rand(4, 7);
       }
@@ -4175,21 +4274,141 @@ function CoinGame(){
         for (const a of arrows) if (a.life > 0 && Math.abs(a.x - b.x) < 6 && Math.abs(a.y - b.y) < 5) {
           a.life = 0; b.dead = true; addScore(25, b.x, b.y - 6); burst(b.x, b.y, 12, ['#8060d8', '#fcfcfc'], 60); sfx.boom();
         }
-        if (!b.dead && heroHit(p, b.x, b.y, 4, 3) && hurtHero(p, b.x)) {
-          addScore(-20, p.x, p.y - 14, 'OUCH!');
-          burst(p.x, p.y - 8, 10, ['#f8d800', '#f87800'], 60, 120, .6);
+        if (!b.dead && heroHit(p, b.x, b.y, 4, 3)) {
+          if (landing(b.x, b.y - 3)) { b.dead = true; stomp(b.x, b.y, 25, 'STOMP!', ['#8060d8', '#fcfcfc']); }
+          else hit(b.x, 'OUCH!');
         }
       }
       bats = bats.filter(b => !b.dead);
+
+      // birds fly over and poop; shoot one and it attacks, and only then can you stomp it
+      birdT -= dt;
+      if (birdT <= 0) {
+        const k = pick(HOOP_BIRDS), dir = Math.random() < .5 ? 1 : -1;
+        birds.push({ k, dir, x: dir > 0 ? -14 : W + 14, y0: rand(18, H * .45), y: 0, sp: rand(32, 50), f: rand(0, 2), bob: rand(0, 6.28), mode: 'fly', t: 0, vx: 0, vy: 0, poopT: rand(1.5, 4) });
+        sfx.tweet(); birdT = rand(5, 9);
+      }
+      for (const bd of birds) {
+        bd.f += dt * (bd.mode === 'fly' ? 7 : 16); bd.t += dt;
+        if (bd.mode === 'fly') {
+          bd.x += bd.dir * bd.sp * dt; bd.bob += dt * 3; bd.y = bd.y0 + Math.sin(bd.bob) * 4;
+          bd.poopT -= dt;
+          if (bd.poopT <= 0 || (Math.abs(bd.x - p.x) < 14 && bd.y < p.y - 16 && bd.poopT < 2.5)) {
+            poops.push({ x: bd.x, y: bd.y + 6, vy: 20 }); bd.poopT = rand(3, 6); tone(300, .08, 'square', .03, -200);
+          }
+          for (const a of arrows) if (a.life > 0 && Math.abs(a.x - bd.x) < 7 && Math.abs(a.y - (bd.y + 3)) < 5) {
+            a.life = 0; bd.mode = 'dive'; bd.t = 0; bd.vx = bd.dir * bd.sp; bd.vy = 0;
+            popups.push({ x: bd.x, y: bd.y - 6, text: 'SQUAWK!', life: .9, col: '#f86060' }); tone(900, .3, 'triangle', .04, -600);
+          }
+        } else if (bd.mode === 'dive') {
+          const dx = p.x - bd.x, dy = (p.y - 6) - (bd.y + 3), d = Math.hypot(dx, dy) || 1, sp = 90;
+          bd.vx += (dx / d * sp - bd.vx) * dt * 2.5; bd.vy += (dy / d * sp - bd.vy) * dt * 2.5;
+          bd.x += bd.vx * dt; bd.y += bd.vy * dt;
+          if (Math.abs(bd.vx) > 5) bd.dir = bd.vx > 0 ? 1 : -1;
+          if (bd.t > 3) bd.mode = 'flee';
+          if (heroHit(p, bd.x, bd.y + 3, 5, 4)) {
+            if (landing(bd.x, bd.y + 3)) { stomp(bd.x, bd.y + 3, 50, 'STOMP!', [bd.k.col, '#fcfcfc']); bd.dead = true; }
+            else { hit(bd.x, 'OUCH!'); bd.mode = 'flee'; }
+          }
+        } else { bd.x += bd.dir * 70 * dt; bd.y -= 60 * dt; }
+      }
+      birds = birds.filter(bd => !bd.dead && bd.x > -20 && bd.x < W + 20 && bd.y > -20);
+      for (const pp of poops) {
+        const py = pp.y;
+        pp.vy = Math.min(160, pp.vy + 260 * dt); pp.y += pp.vy * dt;
+        if (Math.abs(pp.x - p.x) < 5 && pp.y > p.y - 13 && pp.y < p.y + 1) { pp.gone = true; hit(pp.x, 'SPLAT!'); continue; }
+        for (const q of plats) if (py <= q.y && pp.y >= q.y && pp.x > q.x1 && pp.x < q.x2) { pp.gone = true; splats.push({ x: pp.x, y: q.y, t: 1.5 }); break; }
+        if (pp.y > H) pp.gone = true;
+      }
+      poops = poops.filter(pp => !pp.gone);
+      for (const sp of splats) sp.t -= dt;
+      splats = splats.filter(sp => sp.t > 0);
+
+      // ants and scorpions pile up along the floor; scorpions spit slow poison
+      groundT -= dt;
+      if (groundT <= 0 && crawlers.length < 2 + Math.floor(t / 15)) { spawnCrawler(); groundT = rand(4, 7); }
+      for (const c of crawlers) {
+        const img = COIN_SP[c.kind][0].r, hw = img.width / 2, hgt = img.height, cy = FLOOR() - hgt / 2;
+        c.f += dt * (c.kind === 'ant' ? 10 : 5);
+        c.x += c.dir * c.sp * dt;
+        if (c.x < hw) { c.x = hw; c.dir = 1; } else if (c.x > W - hw) { c.x = W - hw; c.dir = -1; }
+        if (c.kind === 'scorpion') {
+          c.shootT -= dt;
+          if (c.shootT <= 0 && Math.abs(p.x - c.x) < 170) {
+            const dx = p.x - c.x, dy = (p.y - 6) - (cy - 2), d = Math.hypot(dx, dy) || 1;
+            blobs.push({ x: c.x + c.dir * 4, y: cy - 2, vx: dx / d * 28, vy: dy / d * 28, life: 7 });
+            c.shootT = rand(3, 5); tone(180, .15, 'square', .03, -60);
+          }
+        }
+        for (const a of arrows) if (a.life > 0 && Math.abs(a.x - c.x) < hw + 1 && Math.abs(a.y - cy) < hgt / 2 + 2) {
+          a.life = 0; c.dead = true;
+          addScore(c.kind === 'ant' ? 15 : 30, c.x, cy - 8); burst(c.x, cy, 10, c.kind === 'ant' ? ['#b02818', '#fcfcfc'] : ['#d8a020', '#fcfcfc'], 50); sfx.boom();
+        }
+        if (!c.dead && heroHit(p, c.x, cy, hw - 1, hgt / 2)) {
+          if (landing(c.x, cy - hgt / 2)) { c.dead = true; stomp(c.x, cy, c.kind === 'ant' ? 15 : 30, 'STOMP!', c.kind === 'ant' ? ['#b02818', '#fcfcfc'] : ['#d8a020', '#fcfcfc']); }
+          else hit(c.x, 'OUCH!');
+        }
+      }
+      crawlers = crawlers.filter(c => !c.dead);
+      for (const b of blobs) {
+        b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+        if (Math.abs(b.x - p.x) < 5 && b.y > p.y - 13 && b.y < p.y + 1) { b.life = 0; hit(b.x, 'POISON!'); }
+      }
+      blobs = blobs.filter(b => b.life > 0 && b.x > -6 && b.x < W + 6 && b.y > -6 && b.y < H + 6);
+
       if (left <= 0) { left = 0; api.done = true; }
     },
     draw(){
-      drawLedges(plats);
+      drawLedges(base);
+      for (const f of floaters) {
+        if (f.life < 1.5 && Math.floor(f.life * 8) % 2) continue;     // blinks before it disappears
+        const c = FLOATER_KINDS[f.kind], x = Math.round(f.cx - f.w / 2), w = Math.max(2, Math.round(f.w)), y = Math.round(f.y);
+        ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, w + 2, 6);
+        ctx.fillStyle = c.body; ctx.fillRect(x, y, w, 4);
+        ctx.fillStyle = c.top; ctx.fillRect(x, y, w, 1);
+        ctx.fillStyle = c.dark;
+        if (f.kind === 'rise') for (let i = x + 3; i < x + w - 2; i += 6) { ctx.fillRect(i, y + 2, 1, 1); ctx.fillRect(i - 1, y + 3, 3, 1); }
+        else if (f.kind === 'ice') { ctx.fillStyle = '#ffffff'; for (let i = x + 2; i < x + w - 2; i += 7) ctx.fillRect(i, y + 1, 2, 1); }
+        else for (let i = x + 3; i < x + w - 1; i += 8) ctx.fillRect(i, y + 2, 1, 2);
+      }
       for (const c of coins) { const img = CL_SP.coin[Math.floor(c.t * 4) % 2]; ctx.drawImage(img, Math.round(c.x - img.width / 2), Math.round(c.y - 2)); }
       if (heart && !(heart.life < 1.5 && Math.floor(heart.life * 8) % 2)) ctx.drawImage(CL_SP.heart, Math.round(heart.x - 3), Math.round(heart.y - 2 + Math.sin(t * 4)));
+      if (letter) {
+        const x = Math.round(letter.x), y = Math.round(letter.y + Math.sin(letter.t * 3) * 2);
+        ctx.fillStyle = '#000'; ctx.fillRect(x - 8, y - 8, 17, 17);
+        ctx.fillStyle = Math.floor(letter.t * 4) % 2 ? '#f8d800' : '#f8b800'; ctx.fillRect(x - 7, y - 7, 15, 15);
+        txt(letter.ch, x + 1, y + 1, '#d82800', 8);
+      }
+      for (const c of crawlers) {
+        const fr = COIN_SP[c.kind][Math.floor(c.f) % 2], img = c.dir > 0 ? fr.r : fr.l;
+        ctx.drawImage(img, Math.round(c.x - img.width / 2), Math.round(FLOOR() - img.height));
+      }
+      for (const b of blobs) {
+        const x = Math.round(b.x), y = Math.round(b.y);
+        ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 2, 5, 5);
+        ctx.fillStyle = Math.floor(b.life * 6) % 2 ? '#58d830' : '#a8f048'; ctx.fillRect(x - 1, y - 1, 3, 3);
+      }
       for (const b of bats) { const fr = CL_SP.bat[Math.floor(b.f) % 2]; ctx.drawImage(fr.l, Math.round(b.x - 5), Math.round(b.y - 3)); }
+      for (const bd of birds) {
+        const fr = bd.k.fr[Math.floor(bd.f) % 2], img = bd.dir > 0 ? fr.r : fr.l;
+        ctx.drawImage(img, Math.round(bd.x - 7), Math.round(bd.y - (img.height > 8 ? 1 : 0)));
+      }
+      for (const pp of poops) {
+        const x = Math.round(pp.x), y = Math.round(pp.y);
+        ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 2, 5, 5);
+        ctx.fillStyle = '#f8f8f8'; ctx.fillRect(x - 1, y - 1, 3, 3);
+        ctx.fillStyle = '#4a3418'; ctx.fillRect(x, y, 1, 1);
+      }
+      for (const sp of splats) {
+        const x = Math.round(sp.x), y = Math.round(sp.y);
+        ctx.globalAlpha = Math.min(1, sp.t);
+        ctx.fillStyle = '#f8f8f8'; ctx.fillRect(x - 3, y - 1, 7, 1); ctx.fillRect(x - 1, y - 2, 3, 1);
+        ctx.globalAlpha = 1;
+      }
       drawArrows(arrows);
       drawHero(p);
+      for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < hearts ? 1 : .25; ctx.drawImage(CL_SP.heart, 4 + i * 9, H - 13); }
+      ctx.globalAlpha = 1;
     },
     press(k){ heroKey(p, k); if (k === 'Space') shootArrow(p, arrows); },
     release(k){ heroRelease(p, k); }
@@ -4649,12 +4868,30 @@ function start(o){
   function intro(){
     parts = []; popups = []; score = 0;
     game = GAME_MAKERS[o.gameId]();
-    state = 'intro'; introT = 4;
-    showPanel(`<h1>${game.title}</h1><p class="how">${game.how}</p>
-      <button data-act="go">GO! <span class="raCd">4</span></button>
-      <p class="tip">SPACE = GO &nbsp; ESC = BACK TO THE MENU</p>`, { go: begin });
+    state = 'intro'; introT = game.wordEntry ? Infinity : 4;          // no countdown while someone is typing a word
+    const wordBox = game.wordEntry ? `<p class="how">WORD OF THE DAY</p>
+      <input class="raWord" maxlength="12" autocomplete="off" spellcheck="false" placeholder="TYPE A WORD" value="${(o.getWord ? o.getWord() : '').replace(/[^A-Z]/g, '')}">` : '';
+    showPanel(`<h1>${game.title}</h1><p class="how">${game.how}</p>${wordBox}
+      <button data-act="go">GO!${game.wordEntry ? '' : ' <span class="raCd">4</span>'}</button>
+      <p class="tip">${game.wordEntry ? 'ENTER = GO' : 'SPACE = GO'} &nbsp; ESC = BACK TO THE MENU</p>`, { go: begin });
+    const inp = panel.querySelector('.raWord');
+    if (inp) {
+      inp.oninput = () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, ''); };
+      inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); begin(); } };
+      setTimeout(() => inp.focus(), 0);
+    }
   }
-  function begin(){ if (state !== 'intro') return; state = 'play'; hidePanel(); }
+  function begin(){
+    if (state !== 'intro') return;
+    const inp = panel.querySelector('.raWord');
+    if (inp) {
+      const wd = inp.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 12);
+      inp.blur();
+      if (o.setWord) o.setWord(wd);
+      game.setWord(wd);
+    }
+    state = 'play'; hidePanel();
+  }
   function finish(){
     const best0 = o.best(), isBest = o.save(score) && score > 0;
     state = 'done';
@@ -4777,6 +5014,7 @@ document.addEventListener("keydown", function(e){
   if (!arcadeGame) return;
   var k = arcadeKeyName(e);
   if (k === "Escape"){ e.preventDefault(); arcadeStop(); return; }
+  if (e.target && e.target.tagName === "INPUT") return;               // typing the word of the day
   if (ARCADE_KEYS.indexOf(k) === -1) return;
   e.preventDefault();
   e.stopPropagation();
@@ -4785,6 +5023,7 @@ document.addEventListener("keydown", function(e){
 document.addEventListener("keyup", function(e){
   if (!arcadeGame) return;
   var k = arcadeKeyName(e);
+  if (e.target && e.target.tagName === "INPUT") return;
   if (ARCADE_KEYS.indexOf(k) !== -1) arcadeGame.key(k, false);
 }, true);
 window.addEventListener("blur", function(){
@@ -4815,6 +5054,8 @@ function arcadeStart(w, gameId){
     best: function(){ return (w.highScores && w.highScores[gameId]) || 0; },
     save: function(s){ return arcadeSaveScore(w, gameId, s); },
     quit: function(){ arcadeStop(); },
+    getWord: function(){ return w.wordOfDay && w.wordOfDay.date === todayKey() ? w.wordOfDay.word : ""; },
+    setWord: function(word){ w.wordOfDay = { date: todayKey(), word: word }; saveState(); },
     gone: function(){ arcadeStop(); }
   };
   if (gameId === "bugs") startArcadeInWindow(w, opts);
