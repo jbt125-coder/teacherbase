@@ -386,7 +386,11 @@ border: 3px solid #1f8f7d;
 .cfuChoices { display: flex; flex-direction: column; gap: 10px; }
 .cfuChoice { display: flex; align-items: center; gap: 16px; font-size: clamp(20px, 2.8vw, 32px); padding: 10px 16px; border-radius: 12px; background: #1d2736; transition: opacity .25s, color .25s; }
 .cfuMark { flex-shrink: 0; width: 1.6em; height: 1.6em; border-radius: 50%; background: #2f3d52; display: flex; align-items: center; justify-content: center; font-weight: 900; }
-.cfuCard.revealed .cfuChoice { opacity: .55; }
+.cfuChoice { cursor: pointer; }
+.cfuCard:not(.revealed) .cfuChoice:hover { background: #26324a; }
+.cfuCard:not(.revealed) .cfuChoice.picked { background: #3a2410; color: #ffb347; font-weight: 800; box-shadow: 0 0 0 3px #ff8c1a; }
+.cfuCard:not(.revealed) .cfuChoice.picked .cfuMark { background: #ff8c1a; color: #141b26; }
+.cfuCard.revealed .cfuChoice { opacity: .55; cursor: default; }
 .cfuCard.revealed .cfuChoice.correct { opacity: 1; color: #ffe100; font-weight: 900; background: #2a2a10; box-shadow: 0 0 0 3px #ffe100; text-shadow: 0 0 12px rgba(255,225,0,.45); }
 .cfuCard.revealed .cfuChoice.correct .cfuMark { background: #ffe100; color: #141b26; }
 .cfuBtns { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 22px; }
@@ -5429,6 +5433,16 @@ function showCfuPopup(questions, subtitle){
     wireButtons();
   }
   function wireButtons(){
+    // the teacher can click a choice to mark the class's pick in orange, until the answer is shown
+    var choices = card.querySelectorAll(".cfuChoice");
+    for (var ci=0;ci<choices.length;ci++){
+      choices[ci].onclick = function(){
+        if (revealed) return;
+        var was = this.classList.contains("picked");
+        for (var cj=0;cj<choices.length;cj++) choices[cj].classList.remove("picked");
+        if (!was) this.classList.add("picked");
+      };
+    }
     card.querySelector(".cfuShow").onclick = function(){
       revealed = !revealed;
       card.classList.toggle("revealed", revealed);
