@@ -393,6 +393,9 @@ border: 3px solid #1f8f7d;
 .cfuBtn { border: none; border-radius: 10px; padding: 12px 20px; font-size: 16px; font-weight: 800; cursor: pointer; background: #2b3648; color: #e6ebf1; }
 .cfuBtn.cfuShow { background: #f8b800; color: #141b26; }
 .cfuBtn.cfuNext { background: #1f8f7d; color: #fff; }
+.cfuBtns.confirm { align-items: center; }
+.cfuAsk { flex: 1; font-size: 18px; font-weight: 800; color: #f4f6f8; }
+.cfuBtn.cfuYes { background: #1f8f7d; color: #fff; }
 
 /* ––––– Arcade (NES look borrowed from the Clean Screen app) ––––– */
 .arcadeMenu {
@@ -418,6 +421,8 @@ border: 3px solid #000; box-shadow: inset -3px -3px 0 #8e8e8e; cursor: pointer;
 .arcadeSndRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .arcadeVol { display: flex; align-items: center; gap: 8px; font-size: 8px; color: #cfcfcf; }
 .arcadeVol input { width: 110px; accent-color: #d82800; cursor: pointer; }
+.arcadeCfuOpt { display: flex; align-items: center; gap: 8px; font-size: 7px; line-height: 1.6; color: #cfcfcf; cursor: pointer; }
+.arcadeCfuOpt input { width: 16px; height: 16px; accent-color: #d82800; flex-shrink: 0; }
 .arcadeVol span { min-width: 2ch; color: #f8b800; font-size: 9px; }
 .arcadeKeys { font-size: 7px; line-height: 2; color: #cfcfcf; }
 .arcadePadHelp { display: none; color: #7dffb0; margin-top: 4px; }
@@ -920,6 +925,10 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
         chip.className = "dockChip";
         chip.innerHTML = '<span class="dot2"></span><span>' + escapeHtml(w.title) + '</span>';
         (function(win){ chip.onclick = function(){ win.closed = false; bringToFront(win); saveState(); renderAll(); }; })(w);
+        if (w.type === "cfu"){
+          chip.title = "Click to open. Right-click to ask one question now.";
+          chip.oncontextmenu = function(e){ e.preventDefault(); cfuAskOne("Quick check"); };
+        }
         dock.appendChild(chip);
       }
       if (w.sentAway && !w.closed){
@@ -4910,13 +4919,14 @@ function start(o){
       <div class="row"><button data-act="again">AGAIN</button><button class="sm" data-act="menu">MENU</button></div>`,
       { again: intro, menu: o.quit });
     if (isBest) sfx.bonus();
+    if (o.finished) o.finished();
   }
 
   function frame(now){
     if (stopped) return;
     if (!box.isConnected) { if (o.gone) o.gone(); return; }
     const dt = Math.min(.05, (now - last) / 1000); last = now;
-    pollPad();
+    if (!(o.paused && o.paused())) pollPad();
     if (state === 'play') {
       game.update(dt); stepFx(dt);
       if (game.done) { state = 'clear'; clearT = 1.8; }
@@ -5022,7 +5032,7 @@ var arcadeGame = null; // the one running game: { key(code, down), stop(), box? 
 
 function arcadeKeyName(e){ return e.key === " " ? "Space" : e.key; }
 document.addEventListener("keydown", function(e){
-  if (!arcadeGame) return;
+  if (!arcadeGame || cfuOpen) return;                                // a question on top of a game gets the keys
   var k = arcadeKeyName(e);
   if (k === "Escape"){ e.preventDefault(); arcadeStop(); return; }
   if (e.target && e.target.tagName === "INPUT") return;               // typing the word of the day
@@ -5066,6 +5076,8 @@ function arcadeStart(w, gameId){
     best: function(){ return (w.highScores && w.highScores[gameId]) || 0; },
     save: function(s){ return arcadeSaveScore(w, gameId, s); },
     quit: function(){ arcadeStop(); },
+    finished: function(){ if (w.arcadeCfu) cfuAskOne("After the game"); },
+    paused: function(){ return cfuOpen; },
     getWord: function(){ return w.wordOfDay && w.wordOfDay.date === todayKey() ? w.wordOfDay.word : ""; },
     setWord: function(word){ w.wordOfDay = { date: todayKey(), word: word }; saveState(); },
     gone: function(){ arcadeStop(); }
@@ -5194,6 +5206,11 @@ function buildArcadeBody(w){
   menu.appendChild(games);
 
 
+  var cfuOpt = document.createElement("label");
+  cfuOpt.className = "arcadeCfuOpt";
+  cfuOpt.innerHTML = '<input type="checkbox"' + (w.arcadeCfu ? " checked" : "") + '> CHECK FOR UNDERSTANDING AFTER EACH GAME';
+  cfuOpt.querySelector("input").onchange = function(e){ w.arcadeCfu = e.target.checked; saveState(); };
+
   var snd = document.createElement("button");
   snd.type = "button";
   snd.className = "arcadeChip";
@@ -5216,6 +5233,7 @@ function buildArcadeBody(w){
   };
   sndRow.appendChild(vol);
   menu.appendChild(sndRow);
+  menu.appendChild(cfuOpt);
 
   var keys = document.createElement("div");
   keys.className = "arcadeKeys";
@@ -5408,17 +5426,38 @@ function showCfuPopup(questions, subtitle){
       '<button type="button" class="cfuBtn cfuNext">' + (idx + 1 < questions.length ? "Next question \u2192" : "Close") + '</button>' +
       (idx + 1 < questions.length ? '<button type="button" class="cfuBtn cfuSkip">Skip the rest</button>' : '') + '</div>';
     card.innerHTML = html;
+    wireButtons();
+  }
+  function wireButtons(){
     card.querySelector(".cfuShow").onclick = function(){
       revealed = !revealed;
       card.classList.toggle("revealed", revealed);
       this.textContent = revealed ? "Hide answer" : "Show answer";
     };
-    card.querySelector(".cfuNext").onclick = function(){
+    var goNext = function(){
       if (idx + 1 < questions.length){ idx++; card.classList.remove("revealed"); render(); }
       else close();
     };
+    card.querySelector(".cfuNext").onclick = function(){ leave(goNext, idx + 1 < questions.length ? "move on to the next question" : "close the question"); };
     var skip = card.querySelector(".cfuSkip");
-    if (skip) skip.onclick = close;
+    if (skip) skip.onclick = function(){ leave(close, "close the question"); };
+  }
+  // never leave a question without its answer showing: light it up, then ask in the button row (below the choices)
+  function leave(go, what){
+    if (revealed){ go(); return; }
+    revealed = true;
+    card.classList.add("revealed");
+    var row = card.querySelector(".cfuBtns"), before = row.innerHTML;
+    row.classList.add("confirm");
+    row.innerHTML = '<span class="cfuAsk">Are you sure you want to ' + what + '?</span>' +
+      '<button type="button" class="cfuBtn cfuNo">No</button><button type="button" class="cfuBtn cfuYes">Yes</button>';
+    row.querySelector(".cfuYes").onclick = go;
+    row.querySelector(".cfuNo").onclick = function(){
+      row.classList.remove("confirm");
+      row.innerHTML = before;
+      wireButtons();
+      card.querySelector(".cfuShow").textContent = "Hide answer";
+    };
   }
   function close(){
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -5428,6 +5467,22 @@ function showCfuPopup(questions, subtitle){
 }
 
 setInterval(cfuCheck, 5000);
+
+// Asks one question that hasn't come up yet: from the bank for the period happening now,
+// or the "anytime" bank outside class time or for a period with no bank.
+function cfuAskOne(source){
+  if (cfuOpen) return;
+  var c = state.cfu, label = null, bank = null;
+  var sched = getActiveSchedule(), mins = new Date().getHours() * 60 + new Date().getMinutes();
+  if (sched && sched.periods) for (var i=0;i<sched.periods.length;i++){
+    var p = sched.periods[i];
+    if (mins >= p.start && mins < p.end && !/lunch/i.test(p.label) && cfuBank(c.periodBanks[p.label])){ label = p.label; bank = cfuBank(c.periodBanks[p.label]); }
+  }
+  if (!bank){ bank = cfuBank(c.anytimeBank) || c.banks.filter(function(b){ return b.questions.length; })[0]; label = "anytime"; }
+  if (!bank || !bank.questions.length){ alert("Add a question bank in the Checks for Understanding window first."); return; }
+  var qs = cfuNextQuestions(label, bank.id, 1);
+  if (qs.length) showCfuPopup(qs, source + " \u00B7 " + (label === "anytime" ? bank.name : label));
+}
 
 /* ---------- the setup window ---------- */
 function buildCfuBody(w){
@@ -5556,6 +5611,17 @@ function buildCfuBody(w){
     };
     perSec.appendChild(row);
   });
+  var any = document.createElement("label");
+  any.className = "cfuPeriodRow";
+  var anyOpts = '<option value="">First bank</option>';
+  c.banks.forEach(function(b){ anyOpts += '<option value="' + b.id + '"' + (c.anytimeBank === b.id ? " selected" : "") + '>' + escapeHtml(b.name) + '</option>'; });
+  any.innerHTML = '<span>Anytime</span><select>' + anyOpts + '</select>';
+  any.querySelector("select").onchange = function(e){ c.anytimeBank = e.target.value || null; saveState(); };
+  perSec.appendChild(any);
+  var anyHint = document.createElement("div");
+  anyHint.className = "cfuHint";
+  anyHint.textContent = "Anytime is used outside class time for right-click and after-game questions. Right-click this window's tab in the dock to ask one question.";
+  perSec.appendChild(anyHint);
   if (!labels.length){
     var np = document.createElement("div");
     np.className = "cfuHint";
