@@ -345,6 +345,55 @@ color: #4a4030; font-size: 11px; font-weight: 600; padding: 5px; cursor: pointer
 .colorPopCustom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 .exitQRich .richToolbar { padding: 4px 6px; }
 
+/* ––––– Checks for Understanding ––––– */
+.cfuSetup { padding: 10px 12px; font-family: -apple-system, sans-serif; color: #2b2318; font-size: 13px; }
+.cfuOnRow { display: flex; gap: 8px; align-items: center; }
+.cfuToggle { border: none; border-radius: 8px; padding: 8px 14px; font-weight: 800; font-size: 13px; cursor: pointer; background: #c9c2ac; color: #4a4030; }
+.cfuToggle.on { background: #1f8f7d; color: #fff; }
+.cfuSmallBtn { border: 1px solid #c9c2ac; background: #fff; color: #4a4030; border-radius: 6px; padding: 5px 9px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.cfuSmallBtn:active { background: #e7e2d6; }
+.cfuNextUp { margin-top: 6px; font-size: 12px; color: #6b6152; }
+.cfuSec { margin-top: 12px; padding-top: 10px; border-top: 1px solid #dcd6c6; }
+.cfuSecTitle { font-size: 10px; font-weight: 800; color: #6b6152; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.cfuCountRow, .cfuCheckRow, .cfuPeriodRow { display: flex; align-items: center; gap: 8px; margin: 5px 0; cursor: pointer; }
+.cfuCountRow input { width: 52px; padding: 5px; border: 1px solid #c9c2ac; border-radius: 6px; font-size: 14px; font-weight: 700; text-align: center; }
+.cfuCountRow span { color: #6b6152; font-size: 12px; }
+.cfuCountRow b { color: #2b2318; font-size: 13px; }
+.cfuCheckRow input { width: 16px; height: 16px; }
+.cfuPeriodRow span { width: 70px; font-weight: 700; }
+.cfuPeriodRow select { flex: 1; padding: 5px; border: 1px solid #c9c2ac; border-radius: 6px; background: #fff; font-size: 12px; }
+.cfuHint { font-size: 11px; color: #8a7f6c; }
+.cfuBankRow { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #fff; border: 1px solid #dcd6c6; border-radius: 8px; margin-bottom: 5px; }
+.cfuBankName { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cfuBankCount { font-size: 11px; color: #8a7f6c; white-space: nowrap; }
+.cfuAdd { margin-top: 2px; }
+.cfuEditor { max-width: 560px; width: 100%; }
+.cfuEditor h3 { margin: 0 0 10px; }
+.cfuBankNameInput { width: 100%; border: 1px solid #3a4a63; background: #10161f; color: #e6ebf1; border-radius: 8px; padding: 9px; font-size: 14px; margin-bottom: 8px; }
+.cfuFormat { font-size: 12px; color: #8fa3ba; line-height: 1.45; margin-bottom: 8px; }
+.cfuFormat b { color: #dce6f0; }
+.cfuText { width: 100%; border: 1px solid #3a4a63; background: #10161f; color: #e6ebf1; border-radius: 8px; padding: 9px; font-size: 13px; font-family: ui-monospace, Menlo, monospace; resize: vertical; }
+.cfuParseMsg { min-height: 18px; font-size: 12px; color: #7dffb0; margin: 6px 0 10px; }
+.cfuParseMsg.warn { color: #ffb37a; }
+.cfuOverlay { position: fixed; inset: 0; z-index: 1150; background: rgba(8,12,18,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.cfuCard {
+width: min(980px, 100%); max-height: 100%; overflow: auto; background: #141b26; color: #f4f6f8; border-radius: 18px;
+box-shadow: 0 20px 60px rgba(0,0,0,.6); padding: 28px 36px 24px; font-family: -apple-system, "Segoe UI", sans-serif;
+border: 3px solid #1f8f7d;
+}
+.cfuTop { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; font-weight: 800; letter-spacing: 1px; color: #7fd8c6; margin-bottom: 16px; }
+.cfuQuestion { font-size: clamp(24px, 3.6vw, 40px); font-weight: 800; line-height: 1.25; margin-bottom: 22px; }
+.cfuChoices { display: flex; flex-direction: column; gap: 10px; }
+.cfuChoice { display: flex; align-items: center; gap: 16px; font-size: clamp(20px, 2.8vw, 32px); padding: 10px 16px; border-radius: 12px; background: #1d2736; transition: opacity .25s, color .25s; }
+.cfuMark { flex-shrink: 0; width: 1.6em; height: 1.6em; border-radius: 50%; background: #2f3d52; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+.cfuCard.revealed .cfuChoice { opacity: .55; }
+.cfuCard.revealed .cfuChoice.correct { opacity: 1; color: #ffe100; font-weight: 900; background: #2a2a10; box-shadow: 0 0 0 3px #ffe100; text-shadow: 0 0 12px rgba(255,225,0,.45); }
+.cfuCard.revealed .cfuChoice.correct .cfuMark { background: #ffe100; color: #141b26; }
+.cfuBtns { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 22px; }
+.cfuBtn { border: none; border-radius: 10px; padding: 12px 20px; font-size: 16px; font-weight: 800; cursor: pointer; background: #2b3648; color: #e6ebf1; }
+.cfuBtn.cfuShow { background: #f8b800; color: #141b26; }
+.cfuBtn.cfuNext { background: #1f8f7d; color: #fff; }
+
 /* ––––– Arcade (NES look borrowed from the Clean Screen app) ––––– */
 .arcadeMenu {
 min-height: 100%; background: #1e1e1e; color: #fcfcfc; font-family: 'Press Start 2P', ui-monospace, Menlo, monospace;
@@ -711,6 +760,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
       bellSchedules: defaultBellSchedules(),
       bellScheduleAssignments: { 1: "monday", 2: "tuesFri", 3: "tuesFri", 4: "tuesFri", 5: "tuesFri" },
       scheduleDateOverrides: {},
+      cfu: defaultCfu(),
       windows: [
         { id: "bellwork", type: "bellwork", title: "Bellwork & Lesson Plan", x: 20, y: 16, w: 480, h: 420, z: 1, closed: false, sentAway: false, content: "BELLWORK (10 min)\n1. What percent of Earth's water is fresh water?\n2. Name the 3 states of water in the water cycle.\n\nLESSON PLAN - Unit 1: Weather & Water Cycle\n- Warm up / bellwork review\n- Notes: Evaporation, Condensation, Precipitation\n- Florida rain gauge lab (grocery store cups)\n- Exit ticket" },
         { id: "timer", type: "timer", title: "Timer", x: 520, y: 16, w: 260, h: 220, z: 2, closed: false, sentAway: false, seconds: 600, remaining: 600, running: false },
@@ -733,6 +783,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     if (!s.bellSchedules) s.bellSchedules = defaultBellSchedules();
     if (!s.bellScheduleAssignments) s.bellScheduleAssignments = { 1: "monday", 2: "tuesFri", 3: "tuesFri", 4: "tuesFri", 5: "tuesFri" };
     if (!s.scheduleDateOverrides) s.scheduleDateOverrides = {};
+    if (!s.cfu) s.cfu = defaultCfu();
     for (var w=0;w<s.windows.length;w++){
       var win = s.windows[w];
       // Hoops moved from 100-point baskets to 2/3/5/10 points, so the old best score no longer compares
@@ -2612,7 +2663,8 @@ var AVAILABLE_NEW_WINDOWS = [
 { type: "seatchart", title: "Seating Chart", soon: true },
 { type: "clock", title: "Wall Clock", soon: false },
 { type: "pointer", title: "Pointer Arrow", soon: false },
-{ type: "arcade", title: "Arcade", soon: false }
+{ type: "arcade", title: "Arcade", soon: false },
+{ type: "cfu", title: "Checks for Understanding", soon: false }
 ];
 
 document.getElementById("cogBtn").onclick = function(){
@@ -3281,7 +3333,7 @@ var id = type + "_" + Date.now();
 Z += 1;
 var sizeDefaults = {
   note:{w:260,h:200}, clock:{w:240,h:190}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320},
-  bellwork:{w:480,h:420}, timer:{w:260,h:220}, signin:{w:260,h:260}, answers:{w:300,h:260}, annotation:{w:400,h:300}, pointer:{w:110,h:110}, arcade:{w:360,h:430}
+  bellwork:{w:480,h:420}, timer:{w:260,h:220}, signin:{w:260,h:260}, answers:{w:300,h:260}, annotation:{w:400,h:300}, pointer:{w:110,h:110}, arcade:{w:360,h:430}, cfu:{w:400,h:560}
 };
 var sz = sizeDefaults[type] || {w:260,h:200};
 var w = { id:id, type:type, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: sz.w, h: sz.h, z: Z, closed:false, sentAway:false };
@@ -3305,6 +3357,7 @@ renderAll();
 var origBuildBody = buildBody;
 buildBody = function(w){
 if (w.type === "arcade") return buildArcadeBody(w);
+if (w.type === "cfu") return buildCfuBody(w);
 if (w.type === "note"){
 var wrap = document.createElement("div");
 wrap.style.height = "100%";
@@ -4906,6 +4959,391 @@ function buildArcadeBody(w){
     '<div class="arcadePadHint">\uD83C\uDFAE HAVE A CONTROLLER? PRESS ANY BUTTON ON IT TO CONNECT</div>';
   menu.appendChild(keys);
   return menu;
+}
+
+/* ============================================================
+CHECKS FOR UNDERSTANDING — multiple-choice pop-ups timed to the bell schedule
+============================================================ */
+var CFU_EXAMPLE = "Question: What is 2 + 2?\nA: 1, B: 2, C: 3, D: 4, Answer: D\n\nQuestion: Which planet is closest to the Sun?\nA: Venus, B: Mercury, C: Earth, D: Mars, Answer: B";
+var CFU_AI_PROMPT = "Write 20 multiple-choice questions about [TOPIC] for [GRADE LEVEL] students.\n" +
+  "Use exactly this format for every question, with a blank line between questions and nothing else before or after:\n\n" +
+  "Question: What is 2 + 2?\nA: 1, B: 2, C: 3, D: 4, Answer: D\n\n" +
+  "Rules: give 4 choices labeled A to D; don't use \"A:\", \"B:\", \"C:\" or \"D:\" inside a choice's text; mix up which letter is correct.";
+var CFU_START_DELAY = 2;   // minutes after the bell for the start-of-class questions
+var CFU_END_BEFORE = 3;    // minutes before the bell for the end-of-class questions
+var CFU_GRACE = 3;         // a pop-up that's this many minutes late is skipped instead of shown
+
+function defaultCfu(){
+  return { enabled: true, counts: { start: 2, middle: 2, end: 2 }, numbers: false, order: "random", shuffle: true,
+    banks: [], periodBanks: {}, progress: {}, done: {} };
+}
+
+// Reads "Question: ... A: x, B: y, C: z, D: w, Answer: D" blocks. Also accepts "A)" / "A." labels,
+// one choice per line, "Q1." style question labels and 2 to 5 choices.
+function parseCfuQuestions(text){
+  var questions = [], problems = [];
+  var blocks = String(text || "").replace(/\r/g, "").split(/\n(?=\s*(?:question|q)\s*\d*\s*[:.)\-]\s)/i);
+  for (var i=0;i<blocks.length;i++){
+    var raw = blocks[i].trim();
+    if (!raw) continue;
+    var body = raw.replace(/^\s*(?:question|q)\s*\d*\s*[:.)\-]\s*/i, "");
+    var ans = body.match(/(?:^|[\s,;])(?:correct\s+)?answer\s*[:.\-]?\s*([A-E])\b/i);
+    if (ans) body = body.slice(0, ans.index);
+    var re = /(^|[\s,;])([A-E])\s*[:.)]\s+/g, marks = [], m;
+    while ((m = re.exec(body))) marks.push({ letter: m[2], at: m.index + m[1].length, textAt: re.lastIndex });
+    // choices must run A, B, C... in order; anything else is part of the question or a choice's text
+    var seq = [];
+    for (var k=0;k<marks.length;k++){ if (marks[k].letter.charCodeAt(0) - 65 === seq.length) seq.push(marks[k]); }
+    var label = raw.split("\n")[0].slice(0, 60);
+    if (!ans || seq.length < 2){ problems.push(label); continue; }
+    var q = body.slice(0, seq[0].at).replace(/\s+/g, " ").trim();
+    var choices = [];
+    for (var c=0;c<seq.length;c++){
+      var end = c + 1 < seq.length ? seq[c+1].at : body.length;
+      choices.push(body.slice(seq[c].textAt, end).replace(/\s+/g, " ").replace(/[\s,;]+$/, "").trim());
+    }
+    var answer = ans[1].toUpperCase().charCodeAt(0) - 65;
+    if (!q || answer >= choices.length || choices.some(function(x){ return !x; })){ problems.push(label); continue; }
+    questions.push({ q: q, choices: choices, answer: answer });
+  }
+  return { questions: questions, problems: problems };
+}
+
+function cfuBank(id){
+  var banks = state.cfu.banks;
+  for (var i=0;i<banks.length;i++){ if (banks[i].id === id) return banks[i]; }
+  return null;
+}
+
+// every period label across all bell schedules, in bell order, skipping lunch
+function cfuPeriodLabels(){
+  var seen = {}, list = [];
+  for (var id in state.bellSchedules){
+    var ps = state.bellSchedules[id].periods || [];
+    for (var i=0;i<ps.length;i++){
+      var l = ps[i].label;
+      if (!seen[l] && !/lunch/i.test(l)){ seen[l] = true; list.push(l); }
+    }
+  }
+  return list;
+}
+
+// same "random" spread every time the page loads on a given day, so middle pop-ups don't move around
+function cfuSeeded(str){
+  var h = 2166136261;
+  for (var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return function(){ h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+}
+
+// today's pop-up times for one period: [{ key, at (minutes), count, part }]
+function cfuSlots(p){
+  var c = state.cfu.counts, slots = [], len = p.end - p.start;
+  if (c.start > 0) slots.push({ key: "start", at: p.start + CFU_START_DELAY, count: c.start, part: "Start of class" });
+  if (c.end > 0 && len > 15) slots.push({ key: "end", at: p.end - CFU_END_BEFORE, count: c.end, part: "End of class" });
+  var from = p.start + 12, to = p.end - 6, n = c.middle;
+  if (n > 0 && to - from >= 5){
+    // split the middle into n equal stretches and pick a random minute in each, so they're spread out
+    var rnd = cfuSeeded(todayKey() + "|" + p.label), span = (to - from) / n;
+    for (var i=0;i<n;i++){
+      var at = Math.round(from + span * i + rnd() * Math.max(0, span - 5));
+      slots.push({ key: "mid" + i, at: at, count: 1, part: "Middle of class" });
+    }
+  }
+  return slots;
+}
+
+function cfuNextQuestions(label, bankId, count){
+  var bank = cfuBank(bankId);
+  if (!bank || !bank.questions.length) return [];
+  var pkey = label + "|" + bankId;
+  var prog = state.cfu.progress[pkey] || (state.cfu.progress[pkey] = { pos: 0, bag: [] });
+  var out = [];
+  for (var i=0;i<count;i++){
+    var idx;
+    if (state.cfu.order === "inorder"){ idx = prog.pos % bank.questions.length; prog.pos = idx + 1; }
+    else {
+      prog.bag = (prog.bag || []).filter(function(n){ return n < bank.questions.length; });
+      if (!prog.bag.length){ for (var n=0;n<bank.questions.length;n++) prog.bag.push(n); }
+      idx = prog.bag.splice(Math.floor(Math.random() * prog.bag.length), 1)[0];
+    }
+    out.push(bank.questions[idx]);
+    if (out.length >= bank.questions.length) break;
+  }
+  saveState();
+  return out;
+}
+
+var cfuOpen = false;
+function cfuCheck(){
+  if (!state || !state.cfu || !state.cfu.enabled || cfuOpen || arcadeGame || location.hash === "#join") return;
+  var sched = getActiveSchedule();
+  if (!sched || !sched.periods) return;
+  var now = new Date(), mins = now.getHours() * 60 + now.getMinutes(), today = todayKey();
+  for (var dk in state.cfu.done){ if (dk.indexOf(today) !== 0) delete state.cfu.done[dk]; }   // forget earlier days
+  for (var i=0;i<sched.periods.length;i++){
+    var p = sched.periods[i];
+    if (mins < p.start || mins >= p.end || /lunch/i.test(p.label)) continue;
+    var bankId = state.cfu.periodBanks[p.label];
+    if (!bankId || !cfuBank(bankId)) return;
+    var slots = cfuSlots(p);
+    for (var s=0;s<slots.length;s++){
+      var sl = slots[s], doneKey = todayKey() + "|" + p.label + "|" + sl.key;
+      if (state.cfu.done[doneKey] || mins < sl.at) continue;
+      state.cfu.done[doneKey] = true;
+      if (mins - sl.at > CFU_GRACE){ saveState(); continue; }   // too late to be useful: skip quietly
+      var qs = cfuNextQuestions(p.label, bankId, sl.count);
+      if (qs.length) showCfuPopup(qs, sl.part + " \u00B7 " + p.label);
+      return;
+    }
+  }
+}
+
+function cfuNextUp(){
+  var sched = getActiveSchedule();
+  if (!sched || !sched.periods) return null;
+  var now = new Date(), mins = now.getHours() * 60 + now.getMinutes(), best = null;
+  for (var i=0;i<sched.periods.length;i++){
+    var p = sched.periods[i];
+    if (/lunch/i.test(p.label) || !state.cfu.periodBanks[p.label] || !cfuBank(state.cfu.periodBanks[p.label])) continue;
+    var slots = cfuSlots(p);
+    for (var s=0;s<slots.length;s++){
+      if (slots[s].at < mins || state.cfu.done[todayKey() + "|" + p.label + "|" + slots[s].key]) continue;
+      if (!best || slots[s].at < best.at) best = { at: slots[s].at, label: p.label, part: slots[s].part, count: slots[s].count };
+    }
+  }
+  return best;
+}
+
+function showCfuPopup(questions, subtitle){
+  cfuOpen = true;
+  var idx = 0, revealed = false;
+  var overlay = document.createElement("div");
+  overlay.className = "cfuOverlay";
+  var card = document.createElement("div");
+  card.className = "cfuCard";
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  function render(){
+    var q = questions[idx], order = [];
+    for (var i=0;i<q.choices.length;i++) order.push(i);
+    if (state.cfu.shuffle){
+      for (var j=order.length-1;j>0;j--){ var r = Math.floor(Math.random() * (j + 1)), tmp = order[j]; order[j] = order[r]; order[r] = tmp; }
+    }
+    revealed = false;
+    var html = '<div class="cfuTop"><span>CHECK FOR UNDERSTANDING</span><span>' + escapeHtml(subtitle) +
+      (questions.length > 1 ? " \u00B7 " + (idx + 1) + " of " + questions.length : "") + '</span></div>' +
+      '<div class="cfuQuestion">' + escapeHtml(q.q) + '</div><div class="cfuChoices">';
+    for (var k=0;k<order.length;k++){
+      var mark = state.cfu.numbers ? String(k + 1) : String.fromCharCode(65 + k);
+      html += '<div class="cfuChoice' + (order[k] === q.answer ? ' correct' : '') + '"><span class="cfuMark">' + mark + '</span><span>' + escapeHtml(q.choices[order[k]]) + '</span></div>';
+    }
+    html += '</div><div class="cfuBtns">' +
+      '<button type="button" class="cfuBtn cfuShow">Show answer</button>' +
+      '<button type="button" class="cfuBtn cfuNext">' + (idx + 1 < questions.length ? "Next question \u2192" : "Close") + '</button>' +
+      (idx + 1 < questions.length ? '<button type="button" class="cfuBtn cfuSkip">Skip the rest</button>' : '') + '</div>';
+    card.innerHTML = html;
+    card.querySelector(".cfuShow").onclick = function(){
+      revealed = !revealed;
+      card.classList.toggle("revealed", revealed);
+      this.textContent = revealed ? "Hide answer" : "Show answer";
+    };
+    card.querySelector(".cfuNext").onclick = function(){
+      if (idx + 1 < questions.length){ idx++; card.classList.remove("revealed"); render(); }
+      else close();
+    };
+    var skip = card.querySelector(".cfuSkip");
+    if (skip) skip.onclick = close;
+  }
+  function close(){
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    cfuOpen = false;
+  }
+  render();
+}
+
+setInterval(cfuCheck, 5000);
+
+/* ---------- the setup window ---------- */
+function buildCfuBody(w){
+  var c = state.cfu;
+  var wrap = document.createElement("div");
+  wrap.className = "cfuSetup";
+
+  function section(title){
+    var sec = document.createElement("div");
+    sec.className = "cfuSec";
+    sec.innerHTML = '<div class="cfuSecTitle">' + title + '</div>';
+    wrap.appendChild(sec);
+    return sec;
+  }
+  function refresh(){ var body = wrap.parentNode; if (!body) return; body.innerHTML = ""; body.appendChild(buildCfuBody(w)); }
+
+  // on/off + what's next
+  var top = document.createElement("div");
+  top.className = "cfuOnRow";
+  var onBtn = document.createElement("button");
+  onBtn.type = "button";
+  onBtn.className = "cfuToggle" + (c.enabled ? " on" : "");
+  onBtn.textContent = c.enabled ? "Pop-ups ON" : "Pop-ups OFF";
+  onBtn.onclick = function(){ c.enabled = !c.enabled; saveState(); refresh(); };
+  top.appendChild(onBtn);
+  var tryBtn = document.createElement("button");
+  tryBtn.type = "button";
+  tryBtn.className = "cfuSmallBtn";
+  tryBtn.textContent = "Try a pop-up now";
+  tryBtn.onclick = function(){
+    var bank = null, cur = getActiveSchedule(), mins = new Date().getHours() * 60 + new Date().getMinutes();
+    if (cur && cur.periods) for (var i=0;i<cur.periods.length;i++){
+      var p = cur.periods[i];
+      if (mins >= p.start && mins < p.end) bank = cfuBank(c.periodBanks[p.label]);
+    }
+    bank = bank || c.banks.filter(function(b){ return b.questions.length; })[0];
+    if (!bank){ alert("Add a question bank first."); return; }
+    var qs = cfuNextQuestions("preview", bank.id, 2);
+    showCfuPopup(qs, "Preview \u00B7 " + bank.name);
+  };
+  top.appendChild(tryBtn);
+  wrap.appendChild(top);
+  var next = cfuNextUp(), nextEl = document.createElement("div");
+  nextEl.className = "cfuNextUp";
+  nextEl.textContent = !c.enabled ? "Pop-ups are off." :
+    next ? "Next: " + next.label + " at " + formatMinutesLabel(next.at) + " (" + next.part.toLowerCase() + ", " + next.count + (next.count === 1 ? " question)" : " questions)") :
+    "No more pop-ups today.";
+  wrap.appendChild(nextEl);
+
+  // when + how many
+  var when = section("When to ask (number of questions)");
+  [["start", "Start of class", "about " + CFU_START_DELAY + " min after the bell"],
+   ["middle", "Middle of class", "spread out at random times"],
+   ["end", "End of class", CFU_END_BEFORE + " min before the bell"]].forEach(function(def){
+    var row = document.createElement("label");
+    row.className = "cfuCountRow";
+    row.innerHTML = '<input type="number" min="0" max="10" value="' + c.counts[def[0]] + '"><span><b>' + def[1] + '</b> ' + def[2] + '</span>';
+    row.querySelector("input").onchange = function(e){
+      c.counts[def[0]] = Math.max(0, Math.min(10, parseInt(e.target.value, 10) || 0));
+      e.target.value = c.counts[def[0]];
+      saveState();
+    };
+    when.appendChild(row);
+  });
+  var hint = document.createElement("div");
+  hint.className = "cfuHint";
+  hint.textContent = "Use 0 to skip that part of class.";
+  when.appendChild(hint);
+
+  // options
+  var opts = section("Options");
+  function check(label, get, set){
+    var row = document.createElement("label");
+    row.className = "cfuCheckRow";
+    row.innerHTML = '<input type="checkbox"' + (get() ? " checked" : "") + '><span>' + label + '</span>';
+    row.querySelector("input").onchange = function(e){ set(e.target.checked); saveState(); };
+    opts.appendChild(row);
+  }
+  check("Number the answers 1 2 3 4 (for holding up fingers)", function(){ return c.numbers; }, function(v){ c.numbers = v; });
+  check("Shuffle the answer choices", function(){ return c.shuffle; }, function(v){ c.shuffle = v; });
+  check("Ask questions in order (unchecked = random)", function(){ return c.order === "inorder"; }, function(v){ c.order = v ? "inorder" : "random"; });
+
+  // banks
+  var banksSec = section("Question banks");
+  if (!c.banks.length){
+    var none = document.createElement("div");
+    none.className = "cfuHint";
+    none.textContent = "No banks yet. Add one and paste in your questions.";
+    banksSec.appendChild(none);
+  }
+  c.banks.forEach(function(bank){
+    var row = document.createElement("div");
+    row.className = "cfuBankRow";
+    row.innerHTML = '<span class="cfuBankName">' + escapeHtml(bank.name) + '</span><span class="cfuBankCount">' + bank.questions.length + ' questions</span>' +
+      '<button type="button" class="cfuSmallBtn cfuEdit">Edit</button><button type="button" class="cfuSmallBtn cfuDel">Delete</button>';
+    row.querySelector(".cfuEdit").onclick = function(){ showCfuBankEditor(bank, refresh); };
+    row.querySelector(".cfuDel").onclick = function(){
+      showConfirm('Delete the question bank "' + bank.name + '"?', function(ok){
+        if (!ok) return;
+        c.banks.splice(c.banks.indexOf(bank), 1);
+        for (var l in c.periodBanks){ if (c.periodBanks[l] === bank.id) delete c.periodBanks[l]; }
+        saveState(); refresh();
+      });
+    };
+    banksSec.appendChild(row);
+  });
+  var addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "cfuSmallBtn cfuAdd";
+  addBtn.textContent = "+ New question bank";
+  addBtn.onclick = function(){ showCfuBankEditor(null, refresh); };
+  banksSec.appendChild(addBtn);
+
+  // which bank each period uses
+  var perSec = section("Which bank each period uses");
+  var labels = cfuPeriodLabels();
+  labels.forEach(function(label){
+    var row = document.createElement("label");
+    row.className = "cfuPeriodRow";
+    var opts2 = '<option value="">No pop-ups</option>';
+    c.banks.forEach(function(b){ opts2 += '<option value="' + b.id + '"' + (c.periodBanks[label] === b.id ? " selected" : "") + '>' + escapeHtml(b.name) + '</option>'; });
+    row.innerHTML = '<span>' + escapeHtml(label) + '</span><select>' + opts2 + '</select>';
+    row.querySelector("select").onchange = function(e){
+      if (e.target.value) c.periodBanks[label] = e.target.value; else delete c.periodBanks[label];
+      saveState(); refresh();
+    };
+    perSec.appendChild(row);
+  });
+  if (!labels.length){
+    var np = document.createElement("div");
+    np.className = "cfuHint";
+    np.textContent = "Set up a bell schedule in the cog menu first.";
+    perSec.appendChild(np);
+  }
+  return wrap;
+}
+
+function showCfuBankEditor(bank, done){
+  var overlay = document.createElement("div");
+  overlay.className = "modalOverlay";
+  var card = document.createElement("div");
+  card.className = "modalCard cfuEditor";
+  card.innerHTML =
+    '<h3>' + (bank ? "Edit question bank" : "New question bank") + '</h3>' +
+    '<input class="cfuBankNameInput" placeholder="Bank name, like Unit 2: Weather" value="' + escapeHtml(bank ? bank.name : "") + '">' +
+    '<div class="cfuFormat">Paste questions in this format. To make them with AI, click <b>Copy AI prompt</b>, paste it into any AI chat, fill in the topic, then paste what it writes here.</div>' +
+    '<textarea class="cfuText" rows="12" placeholder="' + escapeHtml(CFU_EXAMPLE) + '">' + escapeHtml(bank ? bank.text : "") + '</textarea>' +
+    '<div class="cfuParseMsg"></div>' +
+    '<div class="promptRow"><button class="cancelB cfuCopy">Copy AI prompt</button><button class="cancelB cfuCancel">Cancel</button><button class="okB cfuSave">Save</button></div>';
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  var ta = card.querySelector(".cfuText"), msg = card.querySelector(".cfuParseMsg"), nameIn = card.querySelector(".cfuBankNameInput");
+  function check(){
+    var r = parseCfuQuestions(ta.value);
+    msg.className = "cfuParseMsg" + (r.problems.length ? " warn" : "");
+    msg.textContent = !ta.value.trim() ? "" :
+      r.questions.length + " questions read." + (r.problems.length ? " Couldn't read " + r.problems.length + ": " + r.problems.slice(0, 3).join(" | ") : "");
+    return r;
+  }
+  ta.oninput = check;
+  check();
+  (bank ? ta : nameIn).focus();
+  function close(){ if (overlay.parentNode) document.body.removeChild(overlay); }
+  card.querySelector(".cfuCopy").onclick = function(){
+    var btn = this;
+    function copied(){ btn.textContent = "Copied!"; setTimeout(function(){ btn.textContent = "Copy AI prompt"; }, 1500); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(CFU_AI_PROMPT).then(copied, function(){ showPrompt("Copy this prompt", CFU_AI_PROMPT, function(){}, true); });
+    else showPrompt("Copy this prompt", CFU_AI_PROMPT, function(){}, true);
+  };
+  card.querySelector(".cfuCancel").onclick = close;
+  overlay.onclick = function(e){ if (e.target === overlay) close(); };
+  card.querySelector(".cfuSave").onclick = function(){
+    var r = check();
+    if (!r.questions.length){ msg.className = "cfuParseMsg warn"; msg.textContent = "No questions found. Check the format above."; return; }
+    var name = nameIn.value.trim() || "Question bank " + (state.cfu.banks.length + 1);
+    if (bank){ bank.name = name; bank.text = ta.value; bank.questions = r.questions; }
+    else state.cfu.banks.push({ id: "bank_" + Date.now(), name: name, text: ta.value, questions: r.questions });
+    saveState();
+    close();
+    done();
+  };
 }
 
 function exportSession(){
