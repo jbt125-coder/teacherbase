@@ -360,6 +360,11 @@ color: #4a4030; font-size: 11px; font-weight: 600; padding: 5px; cursor: pointer
 .cfuCountRow span { color: #6b6152; font-size: 12px; }
 .cfuCountRow b { color: #2b2318; font-size: 13px; }
 .cfuCheckRow input { width: 16px; height: 16px; }
+.cfuPhraseRow { display: flex; align-items: center; gap: 8px; margin: 5px 0 5px 24px; }
+.cfuPhraseRow span { width: 140px; font-size: 12px; color: #6b6152; }
+.cfuPhraseRow input { flex: 1; min-width: 0; padding: 5px 7px; border: 1px solid #c9c2ac; border-radius: 6px; font-size: 12px; }
+.cfuMic { font-weight: 700; letter-spacing: 0; color: #9fb4c7; }
+.cfuMic.on { color: #ff8a7a; }
 .cfuPeriodRow span { width: 70px; font-weight: 700; }
 .cfuPeriodRow select { flex: 1; padding: 5px; border: 1px solid #c9c2ac; border-radius: 6px; background: #fff; font-size: 12px; }
 .cfuHint { font-size: 11px; color: #8a7f6c; }
@@ -5418,7 +5423,7 @@ function showCfuPopup(questions, subtitle){
       for (var j=order.length-1;j>0;j--){ var r = Math.floor(Math.random() * (j + 1)), tmp = order[j]; order[j] = order[r]; order[r] = tmp; }
     }
     revealed = false;
-    var html = '<div class="cfuTop"><span>CHECK FOR UNDERSTANDING</span><span>' + escapeHtml(subtitle) +
+    var html = '<div class="cfuTop"><span>CHECK FOR UNDERSTANDING<span class="cfuMic"></span></span><span>' + escapeHtml(subtitle) +
       (questions.length > 1 ? " \u00B7 " + (idx + 1) + " of " + questions.length : "") + '</span></div>' +
       '<div class="cfuQuestion">' + escapeHtml(q.q) + '</div><div class="cfuChoices">';
     for (var k=0;k<order.length;k++){
@@ -5431,6 +5436,7 @@ function showCfuPopup(questions, subtitle){
       (idx + 1 < questions.length ? '<button type="button" class="cfuBtn cfuSkip">Skip the rest</button>' : '') + '</div>';
     card.innerHTML = html;
     wireButtons();
+    showMic();
   }
   function wireButtons(){
     // the teacher can click a choice to mark the class's pick in orange, until the answer is shown
@@ -5476,9 +5482,81 @@ function showCfuPopup(questions, subtitle){
   function close(){
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     cfuOpen = false;
+    stopVoice();
+  }
+
+  /* ---- voice control: only listens while this pop-up is open ---- */
+  var rec = null, listening = false, heard = "", micNote = "";
+  function showMic(){
+    var el = card.querySelector(".cfuMic");
+    if (!el) return;
+    el.className = "cfuMic" + (listening ? " on" : "");
+    el.textContent = !state.cfu.voice ? "" : micNote ? " \u00B7 " + micNote : listening ? " \u00B7 \uD83C\uDFA4 Listening" + (heard ? ': \u201C' + heard + '\u201D' : "") : "";
+  }
+  function voiceCommand(text){
+    var said = cfuNormalize(text), words = said.split(" ").filter(Boolean);
+    heard = said; showMic();
+    var confirmRow = card.querySelector(".cfuBtns.confirm");
+    var click = function(sel){ var b = card.querySelector(sel); if (b) b.click(); };
+    if (said.indexOf(cfuNormalize(state.cfu.revealPhrase || CFU_REVEAL_PHRASE)) !== -1){ if (!revealed) click(".cfuShow"); return; }
+    if (said.indexOf(cfuNormalize(state.cfu.nextPhrase || CFU_NEXT_PHRASE)) !== -1){ click(confirmRow ? ".cfuYes" : ".cfuNext"); return; }
+    if (said.indexOf("please choose") !== -1 || words.indexOf("clear") !== -1){
+      var ps = card.querySelectorAll(".cfuChoice.picked");
+      for (var i=0;i<ps.length;i++) ps[i].classList.remove("picked");
+      return;
+    }
+    if (confirmRow){
+      if (/\b(yes|yeah|yep|sure)\b/.test(said)) click(".cfuYes");
+      else if (/\b(no|nope|cancel)\b/.test(said)) click(".cfuNo");
+      return;
+    }
+    // a letter or number only counts when said by itself or in a very short phrase ("B", "letter C", "number two")
+    if (words.length > 4 || revealed) return;
+    var choice = -1;
+    for (var w=0;w<words.length;w++){ if (CFU_SPOKEN[words[w]] !== undefined) choice = CFU_SPOKEN[words[w]]; }
+    var all = card.querySelectorAll(".cfuChoice");
+    if (choice >= 0 && choice < all.length){
+      for (var j=0;j<all.length;j++) all[j].classList.toggle("picked", j === choice);
+    }
+  }
+  function startVoice(){
+    if (!state.cfu.voice) return;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR){ micNote = "Voice needs Chrome or Edge"; showMic(); return; }
+    try {
+      rec = new SR();
+      rec.lang = "en-US"; rec.continuous = true; rec.interimResults = false;
+      rec.onresult = function(e){
+        for (var i=e.resultIndex;i<e.results.length;i++){ if (e.results[i].isFinal) voiceCommand(e.results[i][0].transcript); }
+      };
+      rec.onerror = function(e){
+        if (e.error === "not-allowed" || e.error === "service-not-allowed"){ micNote = "Microphone blocked"; rec = null; listening = false; showMic(); }
+      };
+      rec.onend = function(){ if (rec && cfuOpen){ try { rec.start(); } catch(err){} } };   // the browser stops after a while; keep going while the pop-up is open
+      rec.start();
+      listening = true;
+    } catch(err){ micNote = "Microphone unavailable"; }
+    showMic();
+  }
+  function stopVoice(){
+    if (!rec) return;
+    var r = rec; rec = null; listening = false;
+    try { r.abort(); } catch(err){}
   }
   render();
+  startVoice();
 }
+
+// spoken words for each answer choice, including the ways speech recognition tends to hear single letters
+var CFU_REVEAL_PHRASE = "survey says", CFU_NEXT_PHRASE = "go go go";
+var CFU_SPOKEN = {
+  a: 0, hey: 0, ay: 0, eh: 0, "1": 0, one: 0, won: 0, first: 0,
+  b: 1, bee: 1, be: 1, "2": 1, two: 1, to: 1, too: 1, second: 1,
+  c: 2, see: 2, sea: 2, si: 2, "3": 2, three: 2, tree: 2, third: 2,
+  d: 3, dee: 3, "4": 3, four: 3, for: 3, fourth: 3,
+  e: 4, "5": 4, five: 4, fifth: 4
+};
+function cfuNormalize(t){ return String(t || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim(); }
 
 setInterval(cfuCheck, 5000);
 
@@ -5578,6 +5656,18 @@ function buildCfuBody(w){
   check("Number the answers 1 2 3 4 (for holding up fingers)", function(){ return c.numbers; }, function(v){ c.numbers = v; });
   check("Shuffle the answer choices", function(){ return c.shuffle; }, function(v){ c.shuffle = v; });
   check("Ask questions in order (unchecked = random)", function(){ return c.order === "inorder"; }, function(v){ c.order = v ? "inorder" : "random"; });
+  check("Voice control (Chrome or Edge): say A B C D or 1 2 3 4", function(){ return !!c.voice; }, function(v){ c.voice = v; });
+  [["revealPhrase", "Show answer phrase", CFU_REVEAL_PHRASE], ["nextPhrase", "Next question phrase", CFU_NEXT_PHRASE]].forEach(function(def){
+    var row = document.createElement("label");
+    row.className = "cfuPhraseRow";
+    row.innerHTML = '<span>' + def[1] + '</span><input type="text" placeholder="' + def[2] + '" value="' + escapeHtml(c[def[0]] || "") + '">';
+    row.querySelector("input").onchange = function(e){ c[def[0]] = e.target.value.trim(); saveState(); };
+    opts.appendChild(row);
+  });
+  var vh = document.createElement("div");
+  vh.className = "cfuHint";
+  vh.textContent = "Leave a phrase blank to use the one shown. \"Please choose\" or \"clear\" clears the pick; \"yes\" / \"no\" answer \"Are you sure?\". The mic only listens while a question is up.";
+  opts.appendChild(vh);
 
   // banks
   var banksSec = section("Question banks");
