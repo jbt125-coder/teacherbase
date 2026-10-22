@@ -733,6 +733,11 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     if (!s.bellSchedules) s.bellSchedules = defaultBellSchedules();
     if (!s.bellScheduleAssignments) s.bellScheduleAssignments = { 1: "monday", 2: "tuesFri", 3: "tuesFri", 4: "tuesFri", 5: "tuesFri" };
     if (!s.scheduleDateOverrides) s.scheduleDateOverrides = {};
+    for (var w=0;w<s.windows.length;w++){
+      var win = s.windows[w];
+      // Hoops moved from 100-point baskets to 2/3/5/10 points, so the old best score no longer compares
+      if (win.type === "arcade" && !win.hoopsScoring2){ if (win.highScores) delete win.highScores.hoops; win.hoopsScoring2 = true; }
+    }
     return s;
   }
 
@@ -3288,7 +3293,7 @@ if (type === "bellwork") w.content = "";
 if (type === "timer"){ w.seconds = 600; w.remaining = 600; w.running = false; }
 if (type === "signin") w.roster = [];
 if (type === "answers") w.feed = [];
-if (type === "arcade") w.highScores = {};
+if (type === "arcade"){ w.highScores = {}; w.hoopsScoring2 = true; }
 if (type === "pointer"){ w.text = "Do This!!!"; w.shape = "arrow"; w.dir = -45; w.size = 1; w.animate = true; }
 if (type === "annotation"){ w.penColor = "#ff0000"; w.strokeWidth = 5; w.eraseMode = false; w.drawingData = ""; }
 state.windows.push(w);
@@ -3679,6 +3684,7 @@ function drawArrows(arrows){
 function HoopsGame(){
   const BR = 4, G = 230, ANG = 60 * Math.PI / 180, RIM_W = 19;
   let t = 0, left = 60, made = 0, netT = 0, meter = null, rimSnd = 0, birdT = rand(5, 8), birds = [], hoop = null, moveT = 0, noBallT = 0;
+  let hearts = 3, streak = 0, poops = [], splats = [];
   // stone ledges up both sides of the screen: one jump reaches the next, so you can climb up level with the hoop
   const sideLedges = [];
   for (let y = H - 3 - 46, i = 0; y > 26; y -= 46, i++) {
@@ -3711,7 +3717,8 @@ function HoopsGame(){
 
   function shoot(){
     const b = p.ball, v = 165 + meter.p * 105;
-    b.free = true; b.live = true; b.scored = false; b.from = p.x; b.jump = air(); b.noPick = .6; b.rest = 0; b.ret = false;
+    b.free = true; b.live = true; b.scored = false; b.from = p.x; b.noPick = .6; b.rest = 0; b.ret = false;
+    b.shot = true; b.birdHit = false;                                  // a fresh shot: it either goes in or counts as a miss
     b.x = p.x + p.face * 2; b.y = p.y - 17;
     b.vx = p.face * v * Math.cos(ANG); b.vy = -v * Math.sin(ANG);
     p.ball = null; meter = null; noBallT = 0; sfx.dribble();
@@ -3720,7 +3727,8 @@ function HoopsGame(){
 
   function spawnBird(){
     const k = pick(HOOP_BIRDS), dir = Math.random() < .5 ? 1 : -1;
-    birds.push({ k, dir, x: dir > 0 ? -14 : W + 14, y0: rand(20, H * .6), y: 0, sp: rand(32, 52), f: rand(0, 2), bob: rand(0, 6.28), hit: 0 });
+    birds.push({ k, dir, x: dir > 0 ? -14 : W + 14, y0: rand(20, H * .6), y: 0, sp: rand(32, 52), f: rand(0, 2), bob: rand(0, 6.28), hit: 0,
+      mode: 'fly', vx: 0, vy: 0, t: 0, poopT: rand(1.5, 4) });
     sfx.tweet();
   }
   function birdBonk(b, bd){
@@ -3729,24 +3737,32 @@ function HoopsGame(){
     const nx = dx / d, ny = dy / d, vn = b.vx * nx + b.vy * ny;
     if (vn < 0) { b.vx -= 1.7 * vn * nx; b.vy -= 1.7 * vn * ny; }
     b.x = cx + nx * 8.5; b.y = cy + ny * 8.5;
-    bd.hit = .5; bd.sp *= 1.4;
+    bd.hit = .5;
+    if (b.live) b.birdHit = true;
     burst(cx, cy, 10, [bd.k.col, '#fcfcfc'], 45, 40, .8);
-    popups.push({ x: cx, y: cy - 8, text: pick(['SQUAWK!', 'BLOCKED!', 'TWEET!']), life: .9, col: '#fcfcfc' });
     tone(1500, .08, 'square', .04, -700); tone(1100, .08, 'square', .04, 500, .07);
+    if (bd.mode === 'fly') {                                           // an angry bird dive-bombs the player
+      bd.mode = 'dive'; bd.t = 0; bd.vx = bd.dir * bd.sp; bd.vy = 0;
+      popups.push({ x: cx, y: cy - 8, text: 'SQUAWK!', life: .9, col: '#f86060' });
+      tone(900, .3, 'triangle', .04, -600);
+    }
   }
 
   function stepBall(b, h){
     const py = b.y, hp = hoop;
     b.vy += G * h; b.x += b.vx * h; b.y += b.vy * h; b.rot += b.vx * h / BR;
     if (b.live && !b.scored && moveT <= 0 && py < hp.y && b.y >= hp.y && b.x > hp.rl && b.x < hp.rr) {
-      b.scored = true; b.ret = true; b.vx *= .3; netT = .5; made++;
-      const long = Math.abs(b.from - hoopX()) > 110, bits = [];
-      if (b.jump) bits.push('JUMP SHOT!');
-      if (long) bits.push('LONG SHOT!');
-      addScore(100, hoopX(), hp.y - 12, bits[0] || pick(['SWISH!', 'BUCKET!', 'NOTHIN NET!']));
-      if (b.jump) addScore(50);
-      if (long) addScore(50);
-      if (bits.length > 1) popups.push({ x: hoopX(), y: hp.y - 32, text: bits[1], life: 1, col: '#fcfcfc' });
+      b.scored = true; b.shot = false; b.ret = true; b.vx *= .3; netT = .5; made++;
+      // 2 for a basket, 3 from far away, 5 each once you're on fire (3 in a row), 10 if it bounced off a bird and went in
+      const long = Math.abs(b.from - hoopX()) > 110, onFire = streak >= 3;
+      let pts = long ? 3 : 2, label = long ? 'THREE!' : pick(['SWISH!', 'BUCKET!', 'NOTHIN NET!']);
+      if (onFire) { pts = 5; label = 'ON FIRE!'; }
+      if (b.birdHit) { pts = 10; label = 'BIRDIE BANK!'; }
+      addScore(pts, hoopX(), hp.y - 12, label);
+      streak++;
+      if (streak === 3) { popups.push({ x: hoopX(), y: hp.y - 34, text: 'SHOOTING STREAK!', life: 1.4, col: '#f87800' }); sfx.bonus(); }
+      left += 3;
+      popups.push({ x: W / 2, y: 30, text: '+3 SEC', life: 1, col: '#58f858' });
       sfx.swish();
       moveT = 1;                                                       // the hoop hops to another window
     }
@@ -3768,6 +3784,11 @@ function HoopsGame(){
     if (b.vy >= 0) for (const q of plats) {
       if (py + BR <= q.y + .5 && b.y + BR >= q.y && b.x > q.x1 && b.x < q.x2) {
         b.y = q.y - BR; b.live = false;
+        if (b.shot) {                                                  // landed without going in: a miss ends the streak
+          b.shot = false;
+          if (streak >= 3) popups.push({ x: p.x, y: p.y - 24, text: 'STREAK OVER', life: 1, col: '#f86060' });
+          streak = 0;
+        }
         if (b.ret) { b.ret = false; b.vx = (p.x < b.x ? -1 : 1) * rand(40, 60); }   // made balls roll back toward you
         if (b.vy > 25) { sfx.bounce(b.vy / 3000); b.vy = -b.vy * .55; b.vx *= .85; }
         else { b.vy = 0; b.vx *= Math.pow(.35, h); if (Math.abs(b.vx) < 2) b.vx = 0; }
@@ -3777,10 +3798,16 @@ function HoopsGame(){
     b.rest = b.vy === 0 && b.vx === 0 ? b.rest + h : 0;
   }
 
+  function loseHeart(text){
+    hearts--;
+    popups.push({ x: p.x, y: p.y - 24, text, life: 1, col: '#f86060' });
+    if (hearts <= 0 && !api.done) { meter = null; api.clearText = 'OUT OF HEARTS!'; api.done = true; sfx.over(); }
+  }
+
   const api = {
     title: 'HOOPS',
-    how: '◀ ▶ run &nbsp; ▲ jump (again in the air = double jump)<br>Hold SPACE, let go to shoot &nbsp; ▼ drop off a window<br>Climb the side ledges to get up high! Jump shots +50, long shots +50',
-    status: () => 'TIME ' + fmt(left) + '  BASKETS ' + made,
+    how: '◀ ▶ run &nbsp; ▲ jump (twice = double jump) &nbsp; hold SPACE, let go to shoot<br>Basket 2 &nbsp; long shot 3 &nbsp; 3 in a row = ON FIRE, 5 each &nbsp; off a bird and in 10<br>Stomp a bird +5. Birds you hit dive-bomb you, and watch out for poop!<br>3 hearts &nbsp; every basket adds 3 seconds',
+    status: () => 'TIME ' + fmt(left) + '  BASKETS ' + made + (streak >= 3 ? '  ON FIRE!' : ''),
     clearText: "TIME'S UP!",
     update(dt){
       t += dt; left -= dt; netT = Math.max(0, netT - dt); rimSnd -= dt;
@@ -3810,15 +3837,60 @@ function HoopsGame(){
         }
       }
       birdT -= dt;
-      if (birdT <= 0) { spawnBird(); birdT = rand(7, 11); }
+      if (birdT <= 0) { spawnBird(); birdT = rand(6, 10); }
       for (const bd of birds) {
-        bd.x += bd.dir * bd.sp * dt; bd.f += dt * (bd.hit > 0 ? 16 : 7); bd.bob += dt * 3;
-        bd.y = bd.y0 + Math.sin(bd.bob) * 4; bd.hit = Math.max(0, bd.hit - dt);
+        bd.f += dt * (bd.mode === 'fly' ? 7 : 16); bd.hit = Math.max(0, bd.hit - dt); bd.t += dt;
+        if (bd.mode === 'fly') {
+          bd.x += bd.dir * bd.sp * dt; bd.bob += dt * 3; bd.y = bd.y0 + Math.sin(bd.bob) * 4;
+          bd.poopT -= dt;
+          const overhead = Math.abs(bd.x - p.x) < 14 && bd.y < p.y - 16;
+          if (bd.poopT <= 0 || (overhead && bd.poopT < 2.5)) {          // birds poop now and then, and like to do it right over you
+            poops.push({ x: bd.x, y: bd.y + 6, vy: 20 });
+            bd.poopT = rand(3, 6);
+            tone(300, .08, 'square', .03, -200);
+          }
+        } else if (bd.mode === 'dive') {                               // steers at the player for a few seconds
+          const dx = p.x - bd.x, dy = (p.y - 6) - (bd.y + 3), d = Math.hypot(dx, dy) || 1, sp = 90;
+          bd.vx += (dx / d * sp - bd.vx) * dt * 2.5; bd.vy += (dy / d * sp - bd.vy) * dt * 2.5;
+          bd.x += bd.vx * dt; bd.y += bd.vy * dt;
+          if (Math.abs(bd.vx) > 5) bd.dir = bd.vx > 0 ? 1 : -1;
+          if (bd.t > 3) { bd.mode = 'flee'; }
+        } else {                                                       // flies up and away
+          bd.x += bd.dir * 70 * dt; bd.y -= 60 * dt;
+        }
+        if (bd.mode === 'flee') continue;
+        if (heroHit(p, bd.x, bd.y + 3, 5, 4)) {
+          if (p.vy > 0 && p.y - (bd.y + 3) < 4) {                      // landed on top of it
+            addScore(5, bd.x, bd.y - 6, 'STOMP!');
+            p.vy = -190; p.ground = null; p.air2 = true; p.jumpHeld = true;
+            burst(bd.x, bd.y + 3, 12, [bd.k.col, '#fcfcfc'], 60);
+            sfx.squish();
+            bd.mode = 'flee'; bd.dir = p.x < bd.x ? 1 : -1;
+          } else if (bd.mode === 'dive') {
+            if (hurtHero(p, bd.x)) loseHeart('OUCH!');
+            bd.mode = 'flee';
+          }
+        }
       }
-      birds = birds.filter(bd => bd.x > -20 && bd.x < W + 20);
+      birds = birds.filter(bd => bd.x > -20 && bd.x < W + 20 && bd.y > -20);
+      for (const pp of poops) {
+        const py = pp.y;
+        pp.vy = Math.min(160, pp.vy + 260 * dt); pp.y += pp.vy * dt;
+        if (Math.abs(pp.x - p.x) < 5 && pp.y > p.y - 13 && pp.y < p.y + 1) {
+          pp.gone = true;
+          if (hurtHero(p, pp.x)) loseHeart('SPLAT!');
+          continue;
+        }
+        for (const q of plats) if (py <= q.y && pp.y >= q.y && pp.x > q.x1 && pp.x < q.x2) { pp.gone = true; splats.push({ x: pp.x, y: q.y, t: 1.5 }); break; }
+        if (pp.y > H) pp.gone = true;
+      }
+      poops = poops.filter(pp => !pp.gone);
+      for (const sp of splats) sp.t -= dt;
+      splats = splats.filter(sp => sp.t > 0);
       for (const b of balls) {
         b.noPick = Math.max(0, b.noPick - dt);
         if (b.free) for (let s = 0; s < 3; s++) stepBall(b, dt / 3);
+        if (b.live && streak >= 3) parts.push({ x: b.x + rand(-2, 2), y: b.y + rand(-2, 2), vx: rand(-10, 10), vy: rand(-20, 0), g: 0, life: .35, c: pick(['#f83800', '#f87800', '#f8d800']) });
       }
       if (moveT > 0) { moveT -= dt; if (moveT <= 0) placeHoop(); }
       if (left <= 0) { left = 0; meter = null; api.done = true; }
@@ -3863,6 +3935,24 @@ function HoopsGame(){
         ctx.rotate(Math.round(b.rot / (Math.PI / 2)) * Math.PI / 2);
         ctx.drawImage(b.img, -4, -4); ctx.restore();
       }
+      for (const pp of poops) {
+        const x = Math.round(pp.x), y = Math.round(pp.y);
+        ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 2, 5, 5);
+        ctx.fillStyle = '#f8f8f8'; ctx.fillRect(x - 1, y - 1, 3, 3);
+        ctx.fillStyle = '#4a3418'; ctx.fillRect(x, y, 1, 1);
+      }
+      for (const sp of splats) {
+        const x = Math.round(sp.x), y = Math.round(sp.y);
+        ctx.globalAlpha = Math.min(1, sp.t);
+        ctx.fillStyle = '#f8f8f8'; ctx.fillRect(x - 3, y - 1, 7, 1); ctx.fillRect(x - 1, y - 2, 3, 1);
+        ctx.fillStyle = '#4a3418'; ctx.fillRect(x, y - 1, 1, 1);
+        ctx.globalAlpha = 1;
+      }
+      for (let i = 0; i < 3; i++) {                                    // hearts, bottom left
+        ctx.globalAlpha = i < hearts ? 1 : .25;
+        ctx.drawImage(CL_SP.heart, 4 + i * 9, H - 13);
+      }
+      ctx.globalAlpha = 1;
     },
     press(k){
       heroKey(p, k);
