@@ -415,6 +415,10 @@ align-self: flex-start; font-family: inherit; font-size: 8px; padding: 8px 10px;
 border: 3px solid #000; box-shadow: inset -3px -3px 0 #8e8e8e; cursor: pointer;
 }
 .arcadeChip:active { box-shadow: inset 3px 3px 0 #8e8e8e; }
+.arcadeSndRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.arcadeVol { display: flex; align-items: center; gap: 8px; font-size: 8px; color: #cfcfcf; }
+.arcadeVol input { width: 110px; accent-color: #d82800; cursor: pointer; }
+.arcadeVol span { min-width: 2ch; color: #f8b800; font-size: 9px; }
 .arcadeKeys { font-size: 7px; line-height: 2; color: #cfcfcf; }
 .arcadePadHelp { display: none; color: #7dffb0; margin-top: 4px; }
 .arcadePadHint { color: #8fd0ff; margin-top: 4px; }
@@ -3535,10 +3539,16 @@ const CL_SP = (() => {
 })();
 
 /* ================= AUDIO ================= */
-let AC = null;
+let AC = null, master = null, volume = 7;
 function ac(){
   if (!soundOn) return null;
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      master = AC.createGain(); master.connect(AC.destination);        // every sound goes through one volume knob
+    } catch(e){}
+  }
+  if (master) master.gain.value = Math.pow(volume / 7, 1.5);           // 7 = the original loudness, 10 a bit louder
   if (AC && AC.state === 'suspended') AC.resume();
   return AC;
 }
@@ -3548,7 +3558,7 @@ function tone(f, d, type = 'square', vol = .06, slide = 0, delay = 0){
   o.type = type; o.frequency.setValueAtTime(f, t);
   if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
-  o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + .02);
+  o.connect(g).connect(master); o.start(t); o.stop(t + d + .02);
 }
 function hiss(d, vol = .05, freq = 3000){
   const a = ac(); if (!a) return;
@@ -3557,7 +3567,7 @@ function hiss(d, vol = .05, freq = 3000){
   const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
   s.buffer = buf; f.type = 'highpass'; f.frequency.value = freq;
   g.gain.setValueAtTime(vol, a.currentTime); g.gain.exponentialRampToValueAtTime(.0001, a.currentTime + d);
-  s.connect(f).connect(g).connect(a.destination); s.start();
+  s.connect(f).connect(g).connect(master); s.start();
 }
 const sfx = {
   wipe(){ tone(900, .09, 'triangle', .07, 500); },
@@ -4831,6 +4841,7 @@ const GAME_MAKERS = { hoops: HoopsGame, squish: SquishGame, coins: CoinGame, bug
 
 function start(o){
   soundOn = o.sound !== false;
+  volume = clamp(o.volume || 7, 1, 10);
   topsFn = o.tops || null;
   level = 1;
   for (const k in keys) keys[k] = false;
@@ -5051,6 +5062,7 @@ function arcadeStart(w, gameId){
   var opts = {
     gameId: gameId,
     sound: w.arcadeSound !== false,
+    volume: w.arcadeVolume || 7,
     best: function(){ return (w.highScores && w.highScores[gameId]) || 0; },
     save: function(s){ return arcadeSaveScore(w, gameId, s); },
     quit: function(){ arcadeStop(); },
@@ -5191,7 +5203,19 @@ function buildArcadeBody(w){
     snd.textContent = w.arcadeSound === false ? "SOUND: OFF" : "SOUND: ON";
     saveState();
   };
-  menu.appendChild(snd);
+  var sndRow = document.createElement("div");
+  sndRow.className = "arcadeSndRow";
+  sndRow.appendChild(snd);
+  var vol = document.createElement("label");
+  vol.className = "arcadeVol";
+  vol.innerHTML = 'VOLUME <input type="range" min="1" max="10" step="1" value="' + (w.arcadeVolume || 7) + '"><span>' + (w.arcadeVolume || 7) + '</span>';
+  vol.querySelector("input").oninput = function(e){
+    w.arcadeVolume = parseInt(e.target.value, 10);
+    vol.querySelector("span").textContent = w.arcadeVolume;
+    saveState();
+  };
+  sndRow.appendChild(vol);
+  menu.appendChild(sndRow);
 
   var keys = document.createElement("div");
   keys.className = "arcadeKeys";
