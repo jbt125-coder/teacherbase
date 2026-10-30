@@ -5344,6 +5344,16 @@ function nbgSection(body){
   for (var i=0;i<marks.length;i++) c.push(tidy(body.slice(marks[i].textAt, i + 1 < marks.length ? marks[i+1].at : body.length)));
   return { q: q, c: c, a: a };
 }
+// Text copied out of some AI chats arrives URL-encoded (%20 for spaces, %0A for line breaks), and
+// markdown line breaks leave a "\" at the end of lines: turn it back into plain text
+function nbgTidyPaste(text){
+  var t = String(text || "");
+  if (/%(?:20|0A|0D)/i.test(t) && (t.match(/%[0-9A-F]{2}/gi) || []).length > (t.match(/\s/g) || []).length){
+    try { t = decodeURIComponent(t); }
+    catch(e){ t = t.replace(/(?:%[0-9A-F]{2})+/gi, function(run){ try { return decodeURIComponent(run); } catch(e2){ return run; } }); }
+  }
+  return t.replace(/\r\n?/g, "\n").replace(/[ \t]*\\[ \t]*$/gm, "");
+}
 // Question: ... (English section), then Pregunta: ... (Spanish section) for each question
 function nbgParse(text){
   var out = [], problems = [], noEs = 0, cur = null;
@@ -5469,6 +5479,8 @@ function openNotebookGames(){
     saveState(); stale();
   }
   ["nbgUrl", "nbgGame", "nbgTitle", "nbgMins", "nbgText"].forEach(function(id){ $n(id).addEventListener("change", keep); $n(id).addEventListener("input", stale); });
+  function tidyBox(){ var box = $n("nbgText"), t = nbgTidyPaste(box.value); if (t !== box.value){ box.value = t; keep(); } }
+  $n("nbgText").addEventListener("paste", function(){ setTimeout(tidyBox, 0); });
   overlay.addEventListener("keydown", function(e){ e.stopPropagation(); if (e.key === "Escape") close(); });
 
   $n("nbgCopyP").onclick = function(){
@@ -5481,7 +5493,7 @@ function openNotebookGames(){
   };
 
   $n("nbgMake").onclick = function(){
-    keep();
+    tidyBox(); keep();
     var base = nbgBase(S.url);
     if (!base){ msg("Paste your Class Notebook link first. It starts with https://", "bad"); $n("nbgUrl").focus(); return; }
     if (!window.CompressionStream){ msg("This browser can't make game links. Use a current Chrome, Edge or Safari.", "bad"); return; }
