@@ -5377,11 +5377,7 @@ function nbgParse(text){
 function nbgBase(url){
   url = String(url || "").trim().split("#")[0];
   if (!/^https?:\/\/[^\/\s]+/i.test(url)) return "";
-  if (/(^|\.)pbworks\.com\//i.test(url.replace(/^https?:\/\//i, ""))){
-    url = url.replace(/^http:/i, "https:");
-    // PBworks' file page (/w/file/123/name) only shows the file; /w/file/fetch/123/name opens it
-    url = url.replace(/\/w\/file\/(\d+)\//i, "/w/file/fetch/$1/");
-  }
+  if (/(^|\.)pbworks\.com\//i.test(url.replace(/^https?:\/\//i, ""))) url = url.replace(/^http:/i, "https:");
   if (/\/$/.test(url)) return url + "play.html";
   return url.replace(/\/(index|games|paint|snake|zombie|blasteroids)\.html$/i, "/play.html");
 }
@@ -5438,7 +5434,7 @@ function openNotebookGames(){
     '<div class="nbgCols"><div>' +
       '<label class="nbgLab" for="nbgUrl">Your Class Notebook link (PBworks)</label>' +
       '<input id="nbgUrl" placeholder="https://yourclass.pbworks.com/w/file/fetch/.../digitalnotebook.html" spellcheck="false">' +
-      '<div class="nbgNote">Paste it once and it is remembered. It is the link to the uploaded digitalnotebook.html file, with /w/file/fetch/ in it. A link to the file\'s page is fixed for you.</div>' +
+      '<div class="nbgNote">Paste it once and it is remembered. Use the link to digitalnotebook.html after you upload it to PBworks.</div>' +
       '<div class="nbgRow"><div><label class="nbgLab" for="nbgGame">Game</label><select id="nbgGame">' + opts + '</select></div>' +
       '<div style="flex:.45"><label class="nbgLab" for="nbgMins">Minutes</label><input id="nbgMins" type="number" min="1" max="60"></div></div>' +
       '<label class="nbgLab" for="nbgTitle">Title students see (optional)</label>' +
@@ -5488,10 +5484,6 @@ function openNotebookGames(){
     keep();
     var base = nbgBase(S.url);
     if (!base){ msg("Paste your Class Notebook link first. It starts with https://", "bad"); $n("nbgUrl").focus(); return; }
-    if (base !== S.url && /\/w\/file\/fetch\//i.test(base) && !/\/w\/file\/fetch\//i.test(S.url)){ S.url = base; $n("nbgUrl").value = base; saveState(); }
-    if (/pbworks\.com/i.test(base) && !/\/w\/file\/fetch\/\d+\/[^\/]+\.html?$/i.test(base)){
-      msg("That is a link to a PBworks page, not to the notebook file, so the game can't start from it. Open that page in PBworks, right-click the notebook file's name (like digitalnotebook.html) and choose Copy link address, then paste that here. The right link has /w/file/fetch/ in it.", "bad"); return;
-    }
     if (!window.CompressionStream){ msg("This browser can't make game links. Use a current Chrome, Edge or Safari.", "bad"); return; }
     if (nbgIsPrompt(S.text)){ msg("The box still has the AI prompt in it. Paste the AI's questions in its place.", "bad"); return; }
     var r = nbgParse(S.text), qs = r.questions;
