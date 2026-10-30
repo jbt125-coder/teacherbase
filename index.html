@@ -5490,7 +5490,7 @@ function openNotebookGames(){
     if (!base){ msg("Paste your Class Notebook link first. It starts with https://", "bad"); $n("nbgUrl").focus(); return; }
     if (base !== S.url && /\/w\/file\/fetch\//i.test(base) && !/\/w\/file\/fetch\//i.test(S.url)){ S.url = base; $n("nbgUrl").value = base; saveState(); }
     if (/pbworks\.com/i.test(base) && !/\/w\/file\/fetch\/\d+\/[^\/]+\.html?$/i.test(base)){
-      msg("That doesn't look like the link to the notebook file itself. In PBworks, open the file's page and copy the link to the file (it has /w/file/fetch/ in it).", "bad"); return;
+      msg("That is a link to a PBworks page, not to the notebook file, so the game can't start from it. Open that page in PBworks, right-click the notebook file's name (like digitalnotebook.html) and choose Copy link address, then paste that here. The right link has /w/file/fetch/ in it.", "bad"); return;
     }
     if (!window.CompressionStream){ msg("This browser can't make game links. Use a current Chrome, Edge or Safari.", "bad"); return; }
     if (nbgIsPrompt(S.text)){ msg("The box still has the AI prompt in it. Paste the AI's questions in its place.", "bad"); return; }
