@@ -6140,6 +6140,8 @@ var SEAT_KINDS = {
   sink:     { name: "Sink", icon: "🚰", w: 70, h: 50 },
   plant:    { name: "Plant", icon: "🪴", w: 46, h: 46 },
   trash:    { name: "Trash can", icon: "🗑️", w: 38, h: 38 },
+  numcircle:{ name: "Number circle", w: 30, h: 30 },
+  numsquare:{ name: "Number square", w: 30, h: 30 },
   rug:      { name: "Rug", w: 200, h: 140 },
   label:    { name: "Text label", w: 130, h: 30 }
 };
@@ -6151,6 +6153,9 @@ var SEAT_PALETTE = [
     { kind: "table", seats: 6, w: 210, h: 90, name: "Table for 6" },
     { kind: "round", seats: 4, name: "Round table" }
   ]},
+  { group: "Numbers", items: [
+    { kind: "numcircle", name: "① Add number" }, { kind: "numsquare", name: "1 Add number" }
+  ]},
   { group: "Room", items: [
     { kind: "board", name: "Whiteboard" }, { kind: "screen", name: "Screen / TV" },
     { kind: "teacher", name: "Teacher desk" }, { kind: "door", name: "Door" },
@@ -6161,7 +6166,7 @@ var SEAT_PALETTE = [
     { kind: "label", name: "Text label" }
   ]}
 ];
-var SEAT_TAG_COLORS = ["#3a7bd5","#2f9e44","#e8590c","#7048e8","#c2255c","#0c8599","#e67700","#5c940d"];
+var SEAT_TAG_COLORS = ["#3a7bd5","#2f9e44","#e03131","#7048e8","#c2255c","#0c8599","#e67700","#5c940d"];
 var SEAT_RULES_YES = [["none","No rule"],["front","Front of room"],["back","Back of room"],["teacher","Near teacher desk"],["together","Sit together"],["apart","Keep apart"]];
 var SEAT_RULES_LEVEL = [["none","No rule"],["mix","Mix (keep 1s apart)"],["front","1s up front"],["teacher","1s near teacher"]];
 var SEAT_LEVELS = ["", "1 Low", "2 Mid", "3 High"];
@@ -6193,6 +6198,9 @@ var SEAT_CSS =
 ".seatItem.k-computer,.seatItem.k-sink{background:#dfe5ea;border:2px solid #8b99a6;border-radius:6px;font-size:11px;font-weight:700;}" +
 ".seatItem.k-plant,.seatItem.k-trash{background:#e3eedc;border:2px solid #8aa77a;border-radius:50%;font-size:10px;}" +
 ".seatItem.k-trash{background:#e3e3e3;border-color:#999;}" +
+".seatItem.k-numcircle,.seatItem.k-numsquare{background:#fff;border:2px solid #24303f;font-size:14px;font-weight:800;color:#24303f;z-index:4;}" +
+".seatItem.k-numcircle{border-radius:50%;}" +
+".seatItem.k-numsquare{border-radius:4px;}" +
 ".seatItem.k-rug{background:rgba(196,132,92,0.22);border:2px dashed #c4845c;border-radius:12px;font-size:12px;font-weight:700;color:#8a5a3a;}" +
 ".seatItem.k-label{background:transparent;border:1px dashed transparent;font-size:15px;font-weight:800;color:#3d3528;}" +
 ".seatIco{font-size:18px;line-height:1;}" +
@@ -6256,6 +6264,9 @@ var SEAT_ED_CSS =
 ".seatStuTable td.c,.seatStuTable th.c{text-align:center;}" +
 ".seatStuTable input[type=text]{width:100%;min-width:120px;max-width:260px;}" +
 ".seatStuTable input[type=checkbox]{width:18px;height:18px;accent-color:#1f8f7d;}" +
+".seatStuTable input.seatTagCb{-webkit-appearance:none;appearance:none;width:22px;height:22px;margin:0;vertical-align:middle;border-radius:6px;cursor:pointer;" +
+  "border:2px solid var(--c);background:#fff;background:color-mix(in srgb, var(--c) 28%, white);}" +
+".seatStuTable input.seatTagCb:checked{background:var(--c) url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3 3 7-7' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") center/16px no-repeat;}" +
 ".seatStuEmpty{color:#8fa3ba;text-align:center;padding:40px 10px;font-size:14px;}" +
 ".seatReport{font-size:12px;line-height:1.45;background:#0f151f;border-radius:8px;padding:8px 10px;}" +
 ".seatReport div{padding:3px 0;}" +
@@ -6297,6 +6308,8 @@ function seatState(){
       periods: {}
     };
   }
+  var tg = state.seating.tags;
+  for (var i=0;i<tg.length;i++) if (tg[i].id === "talk" && tg[i].color === "#e8590c") tg[i].color = "#e03131"; // Talkative used to be orange
   return state.seating;
 }
 
@@ -6698,11 +6711,13 @@ function seatFreeSpot(w, h){
   }
   return { x: 20, y: seatRoomH() };
 }
+function seatIsMarker(kind){ return kind === "numcircle" || kind === "numsquare"; }
 function seatNextNumber(kind){
   var items = seatState().items, mx = 0;
   for (var i=0;i<items.length;i++){
     var it = items[i];
-    if (kind === "desk" ? it.kind !== "desk" : !(it.kind === "table" || it.kind === "round")) continue;
+    var match = kind === "desk" ? it.kind === "desk" : kind === "marker" ? seatIsMarker(it.kind) : (it.kind === "table" || it.kind === "round");
+    if (!match) continue;
     var mm = String(it.label || "").match(/(\d+)\s*$/);
     if (mm) mx = Math.max(mx, parseInt(mm[1], 10));
   }
@@ -6714,6 +6729,7 @@ function seatNewItem(spec, x, y){
   if (spec.kind === "table" || spec.kind === "round") it.seats = spec.seats || kd.seats;
   if (spec.kind === "desk") it.label = String(seatNextNumber("desk"));
   else if (it.seats) it.label = "Table " + seatNextNumber("table");
+  else if (seatIsMarker(spec.kind)) it.label = String(seatNextNumber("marker"));
   else it.label = kd.name;
   if (x == null){ var p = seatFreeSpot(it.w, it.h); x = p.x; y = p.y; }
   else { x -= it.w / 2; y -= it.h / 2; }
@@ -7016,7 +7032,7 @@ function seatOpenEditor(period){
       }));
       r5.appendChild(btn("Copy", "grow", function(){
         var c = seatNewItem({ kind: it.kind, w: it.w, h: it.h, seats: it.seats });
-        if (!seatIsSeatKind(it.kind)) c.label = it.label;
+        if (!seatIsSeatKind(it.kind) && !seatIsMarker(it.kind)) c.label = it.label;
         if (!seatOverlaps(it.x + it.w + 20, it.y, it.w, it.h, c.id) && it.x + it.w*2 + 20 <= SEAT_W){ c.x = it.x + it.w + 20; c.y = it.y; }
         ed.sel = c.id; saveState(); render();
       }));
@@ -7026,7 +7042,8 @@ function seatOpenEditor(period){
     }
 
     for (var g=0;g<SEAT_PALETTE.length;g++){
-      head(SEAT_PALETTE[g].group === "Seats" ? "Seats & tables" : "Room items");
+      var grp = SEAT_PALETTE[g].group;
+      head(grp === "Seats" ? "Seats & tables" : grp === "Numbers" ? "Number markers" : "Room items");
       var pal = el("div", "seatPal");
       SEAT_PALETTE[g].items.forEach(function(spec){
         var kd = SEAT_KINDS[spec.kind];
@@ -7214,7 +7231,7 @@ function seatOpenEditor(period){
     }
     var tbl = el("table", "seatStuTable");
     var h = "<thead><tr><th>#</th><th>Name</th>";
-    ss.tags.forEach(function(t){ h += '<th class="c"><span style="color:' + t.color + '">●</span> ' + escapeHtml(t.name) + '</th>'; });
+    ss.tags.forEach(function(t){ h += '<th class="c" style="background:' + t.color + '38;color:#e6ebf1;"><span style="color:' + t.color + '">●</span> ' + escapeHtml(t.name) + '</th>'; });
     h += "<th>Seat</th><th></th></tr></thead>";
     tbl.innerHTML = h;
     var tb = el("tbody");
@@ -7227,6 +7244,7 @@ function seatOpenEditor(period){
       td.appendChild(ni); tr.appendChild(td);
       ss.tags.forEach(function(t){
         var c = el("td", "c");
+        c.style.background = t.color + "38"; // light tint of the tag's color down the whole column
         if (t.kind === "level"){
           var s = el("select");
           for (var lv=0;lv<=3;lv++) s.innerHTML += '<option value="' + lv + '">' + (lv ? SEAT_LEVELS[lv] : "–") + '</option>';
@@ -7235,6 +7253,8 @@ function seatOpenEditor(period){
           c.appendChild(s);
         } else {
           var cb = el("input"); cb.type = "checkbox"; cb.checked = !!st.tags[t.id];
+          cb.className = "seatTagCb";
+          cb.style.setProperty("--c", t.color);
           cb.onchange = function(){ if (cb.checked) st.tags[t.id] = true; else delete st.tags[t.id]; saveState(); };
           c.appendChild(cb);
         }
