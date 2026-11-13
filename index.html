@@ -6660,12 +6660,13 @@ function seatReport(per){
   for (var s=0;s<per.students.length;s++) byId[per.students[s].id] = per.students[s];
   for (var i=0;i<m.n;i++) assign[i] = byId[per.seats[m.seats[i].id]] || null;
   var groups = {}, bad = {}, pinnedSkips = 0;
+  // still flag hand-placed (locked) students as a reminder; the 🔒 shows the teacher chose that seat
+  function nm(st){ return st.name + (st.lock ? " 🔒" : ""); }
   seatScore(m, assign, seatActiveTags(), function(tag, type, list){
-    for (var q=0;q<list.length;q++) if (assign[list[q]].lock){ pinnedSkips++; return; } // the teacher's placement overrides the rule
     var g = groups[tag.id] || (groups[tag.id] = { tag: tag, pos: [], alone: [], pairs: [] });
-    for (var k=0;k<list.length;k++) bad[m.seats[list[k]].id] = true;
-    if (type === "pair") g.pairs.push(assign[list[0]].name + " & " + assign[list[1]].name);
-    else g[type].push(assign[list[0]].name);
+    for (var k=0;k<list.length;k++){ bad[m.seats[list[k]].id] = true; if (assign[list[k]].lock) pinnedSkips++; }
+    if (type === "pair") g.pairs.push(nm(assign[list[0]]) + " & " + nm(assign[list[1]]));
+    else g[type].push(nm(assign[list[0]]));
   });
   var lines = [];
   var seated = 0;
@@ -7353,7 +7354,7 @@ function seatOpenEditor(period){
     else rb.innerHTML = rep.lines.map(function(l){ return '<div class="no">• ' + escapeHtml(l) + '</div>'; }).join("");
     side.appendChild(rb);
     if (rep && rep.lines.length) hint("Seats outlined in red break a rule. Shuffle again, or drag names to fix them by hand.");
-    if (rep && rep.pinnedSkips) hint("🔒 Locked students stay where you put them, even where that breaks a rule, so they aren't flagged.");
+    if (rep && rep.pinnedSkips) hint("Red outlines are only reminders. Students locked 🔒 stay where you put them, and shuffles won't move them.");
 
     var uns = p.students.filter(function(s){ return !seatOfStudent(p, s.id); });
     head("Not seated (" + uns.length + ")");
@@ -7365,7 +7366,7 @@ function seatOpenEditor(period){
       tray.appendChild(c);
     });
     side.appendChild(tray);
-    hint("Drag a name to any seat to move or swap it. Your move always wins over the rules: the student gets locked 🔒 there so shuffles leave them. Click a name to lock or unlock it.");
+    hint("Drag a name to any seat to move or swap it. Your move always wins over the rules (a red outline is just a reminder): the student gets locked 🔒 there so shuffles leave them. Click a name to lock or unlock it.");
   }
   function nameDrag(e, st, fromSeat){
     seatDragName(e, per(), st, fromSeat, render, fromSeat ? function(){ st.lock = st.lock === fromSeat ? null : fromSeat; saveState(); render(); } : null);
