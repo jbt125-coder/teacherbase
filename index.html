@@ -1477,6 +1477,19 @@ if (w.type === "bellwork"){
     if (popup.closed){ clearInterval(iv); return; }
     refresh();
   }, 1500);
+} else if (w.type === "seatchart"){
+  seatCss(popup.document);
+  target.style.cssText = "position:relative;height:calc(100vh - 60px);padding:0;white-space:normal;";
+  var seatHost = popup.document.createElement("div");
+  seatHost.className = "seatFitHost";
+  seatHost.style.cssText = "position:absolute;inset:10px;";
+  target.appendChild(seatHost);
+  var seatO = { period: seatShownPeriod(w), mode: "view", showTags: false };
+  var seatApi = seatMount(seatHost, seatO);
+  var seatIv = setInterval(function(){
+    if (popup.closed){ clearInterval(seatIv); return; }
+    seatO.period = seatShownPeriod(w); seatApi.draw();
+  }, 2000);
 } else {
   target.textContent = "Live view of \"" + w.title + "\" — this content type doesn't pop out with full interactivity yet, but you can keep it visible here for your second screen.";
 }
@@ -2715,7 +2728,7 @@ var AVAILABLE_NEW_WINDOWS = [
 { type: "exitslip", title: "Exit Slip", soon: false },
 { type: "annotation", title: "Transparency Overlay", soon: false },
 { type: "poll", title: "Live Poll", soon: true },
-{ type: "seatchart", title: "Seating Chart", soon: true },
+{ type: "seatchart", title: "Seating Chart", soon: false },
 { type: "clock", title: "Wall Clock", soon: false },
 { type: "pointer", title: "Pointer Arrow", soon: false },
 { type: "arcade", title: "Arcade", soon: false },
@@ -3388,7 +3401,7 @@ var id = type + "_" + Date.now();
 Z += 1;
 var sizeDefaults = {
   note:{w:260,h:200}, clock:{w:240,h:190}, youtube:{w:340,h:260}, spinner:{w:300,h:430}, exitslip:{w:300,h:320},
-  bellwork:{w:480,h:420}, timer:{w:260,h:220}, signin:{w:260,h:260}, answers:{w:300,h:260}, annotation:{w:400,h:300}, pointer:{w:110,h:110}, arcade:{w:360,h:430}, cfu:{w:400,h:560}
+  bellwork:{w:480,h:420}, timer:{w:260,h:220}, signin:{w:260,h:260}, answers:{w:300,h:260}, annotation:{w:400,h:300}, pointer:{w:110,h:110}, arcade:{w:360,h:430}, cfu:{w:400,h:560}, seatchart:{w:560,h:440}
 };
 var sz = sizeDefaults[type] || {w:260,h:200};
 var w = { id:id, type:type, title:title, x: 60+Math.random()*80, y: 60+Math.random()*60, w: sz.w, h: sz.h, z: Z, closed:false, sentAway:false };
@@ -3399,6 +3412,7 @@ if (type === "exitslip"){ w.question = ""; w.feed = []; }
 if (type === "bellwork") w.content = "";
 if (type === "timer"){ w.seconds = 600; w.remaining = 600; w.running = false; }
 if (type === "signin") w.roster = [];
+if (type === "seatchart") w.period = "auto";
 if (type === "answers") w.feed = [];
 if (type === "arcade"){ w.highScores = {}; w.hoopsScoring2 = true; }
 if (type === "pointer"){ w.text = "Do This!!!"; w.shape = "arrow"; w.dir = -45; w.size = 1; w.animate = true; }
@@ -3413,6 +3427,7 @@ var origBuildBody = buildBody;
 buildBody = function(w){
 if (w.type === "arcade") return buildArcadeBody(w);
 if (w.type === "cfu") return buildCfuBody(w);
+if (w.type === "seatchart") return buildSeatBody(w);
 if (w.type === "note"){
 var wrap = document.createElement("div");
 wrap.style.height = "100%";
@@ -6101,6 +6116,1236 @@ try { localStorage.setItem(STORAGE_KEY, JSON.stringify(st)); } catch(e){}
 }
 document.getElementById("joinMsg").textContent = "You're signed in, " + name + "! (Note: on separate devices this requires the PeerJS/WiFi sync layer to relay to the teacher's screen live.)";
 };
+}
+
+/* ============================================================
+SEATING CHART
+The room (desks, tables, whiteboard, doors...) is shared by every period.
+Each period has its own students, tags and seats. Tags never show on the
+board window, only inside the editor and on the private printout.
+============================================================ */
+var SEAT_W = 1000, SEAT_MIN_H = 700, SEAT_NEAR = 60, SEAT_FAR = 150;
+var SEAT_KINDS = {
+  desk:     { name: "Student desk", w: 80, h: 56 },
+  table:    { name: "Table", w: 150, h: 90, seats: 4 },
+  round:    { name: "Round table", w: 140, h: 140, seats: 4 },
+  board:    { name: "Whiteboard", w: 260, h: 18 },
+  screen:   { name: "Screen / TV", w: 160, h: 18 },
+  teacher:  { name: "Teacher desk", icon: "🍎", w: 140, h: 70 },
+  door:     { name: "Door", icon: "🚪", w: 70, h: 18 },
+  window:   { name: "Window", w: 150, h: 12 },
+  shelf:    { name: "Bookshelf", icon: "📚", w: 130, h: 36 },
+  cabinet:  { name: "Cabinet", icon: "🗄️", w: 80, h: 44 },
+  computer: { name: "Computer", icon: "💻", w: 70, h: 50 },
+  sink:     { name: "Sink", icon: "🚰", w: 70, h: 50 },
+  plant:    { name: "Plant", icon: "🪴", w: 46, h: 46 },
+  trash:    { name: "Trash can", icon: "🗑️", w: 38, h: 38 },
+  rug:      { name: "Rug", w: 200, h: 140 },
+  label:    { name: "Text label", w: 130, h: 30 }
+};
+var SEAT_PALETTE = [
+  { group: "Seats", items: [
+    { kind: "desk", name: "Student desk" },
+    { kind: "table", seats: 2, w: 120, h: 60, name: "Table for 2" },
+    { kind: "table", seats: 4, name: "Table for 4" },
+    { kind: "table", seats: 6, w: 210, h: 90, name: "Table for 6" },
+    { kind: "round", seats: 4, name: "Round table" }
+  ]},
+  { group: "Room", items: [
+    { kind: "board", name: "Whiteboard" }, { kind: "screen", name: "Screen / TV" },
+    { kind: "teacher", name: "Teacher desk" }, { kind: "door", name: "Door" },
+    { kind: "window", name: "Window" }, { kind: "shelf", name: "Bookshelf" },
+    { kind: "cabinet", name: "Cabinet" }, { kind: "computer", name: "Computer" },
+    { kind: "sink", name: "Sink" }, { kind: "plant", name: "Plant" },
+    { kind: "trash", name: "Trash can" }, { kind: "rug", name: "Rug" },
+    { kind: "label", name: "Text label" }
+  ]}
+];
+var SEAT_TAG_COLORS = ["#3a7bd5","#2f9e44","#e8590c","#7048e8","#c2255c","#0c8599","#e67700","#5c940d"];
+var SEAT_RULES_YES = [["none","No rule"],["front","Front of room"],["back","Back of room"],["teacher","Near teacher desk"],["together","Sit together"],["apart","Keep apart"]];
+var SEAT_RULES_LEVEL = [["none","No rule"],["mix","Mix (keep 1s apart)"],["front","1s up front"],["teacher","1s near teacher"]];
+var SEAT_LEVELS = ["", "1 Low", "2 Mid", "3 High"];
+
+var SEAT_CSS =
+".seatWinBody{height:100%;display:flex;flex-direction:column;}" +
+".seatWinBar{display:flex;gap:6px;align-items:center;padding:6px 8px;flex-wrap:wrap;}" +
+".seatWinBar select{flex:1;min-width:90px;border:1px solid #c9c2ac;border-radius:7px;padding:5px;font-size:12px;background:#fff;color:#24303f;font-family:inherit;}" +
+".seatWinBtn{border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;background:#1f8f7d;color:#fff;}" +
+".seatWinBtn.alt{background:#e2ddcf;color:#3d3528;}" +
+".seatFitHost{position:relative;overflow:hidden;}" +
+".seatWinBody .seatFitHost{flex:1;min-height:0;margin:0 8px 8px;}" +
+".seatWinEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#6b6152;font-size:13px;cursor:pointer;}" +
+".seatFit{position:absolute;left:0;top:0;}" +
+".seatRoom{position:absolute;left:0;top:0;transform-origin:0 0;box-sizing:border-box;background-color:#f6f3ec;" +
+  "background-image:linear-gradient(#e7e1d3 1px,transparent 1px),linear-gradient(90deg,#e7e1d3 1px,transparent 1px);background-size:50px 50px;" +
+  "border:3px solid #6b6152;border-radius:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;touch-action:none;" +
+  "-webkit-print-color-adjust:exact;print-color-adjust:exact;}" +
+".seatItem{position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;text-align:center;font-size:13px;color:#3d3528;user-select:none;-webkit-user-select:none;touch-action:none;line-height:1.1;}" +
+".seatItem.k-desk{background:#e2c597;border:2px solid #9c7a4a;border-radius:6px;}" +
+".seatItem.k-table{background:#d2b07f;border:2px solid #8c6a3a;border-radius:9px;}" +
+".seatItem.k-round{background:#d2b07f;border:2px solid #8c6a3a;border-radius:50%;}" +
+".seatItem.k-board{background:#fff;border:2px solid #7d8a99;border-radius:3px;font-size:11px;font-weight:800;color:#4a5868;}" +
+".seatItem.k-screen{background:#2b3442;border:2px solid #111;border-radius:3px;font-size:11px;font-weight:800;color:#dfe7f1;}" +
+".seatItem.k-teacher{background:#b98d5a;border:2px solid #7a5530;border-radius:6px;font-weight:800;color:#fff;}" +
+".seatItem.k-door{background:#a0703c;border:2px solid #6e4a22;border-radius:3px;font-size:10px;font-weight:800;color:#fff;}" +
+".seatItem.k-window{background:#bfe3f5;border:2px solid #6aa9c9;border-radius:2px;font-size:9px;font-weight:700;color:#2d6680;}" +
+".seatItem.k-shelf,.seatItem.k-cabinet{background:#c7b9a0;border:2px solid #85775f;border-radius:4px;font-size:11px;font-weight:700;}" +
+".seatItem.k-computer,.seatItem.k-sink{background:#dfe5ea;border:2px solid #8b99a6;border-radius:6px;font-size:11px;font-weight:700;}" +
+".seatItem.k-plant,.seatItem.k-trash{background:#e3eedc;border:2px solid #8aa77a;border-radius:50%;font-size:10px;}" +
+".seatItem.k-trash{background:#e3e3e3;border-color:#999;}" +
+".seatItem.k-rug{background:rgba(196,132,92,0.22);border:2px dashed #c4845c;border-radius:12px;font-size:12px;font-weight:700;color:#8a5a3a;}" +
+".seatItem.k-label{background:transparent;border:1px dashed transparent;font-size:15px;font-weight:800;color:#3d3528;}" +
+".seatIco{font-size:18px;line-height:1;}" +
+".seatItem.k-plant .seatLbl,.seatItem.k-trash .seatLbl{display:none;}" +
+".seatItem.sel{outline:3px solid #1f8f7d;outline-offset:3px;z-index:5;}" +
+".seatItem.k-label.sel{border-color:#1f8f7d;}" +
+".seatResize{position:absolute;right:-9px;bottom:-9px;width:16px;height:16px;background:#1f8f7d;border:2px solid #fff;border-radius:50%;cursor:nwse-resize;z-index:6;box-shadow:0 1px 4px rgba(0,0,0,.4);}" +
+".seatSlot{position:absolute;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;overflow:hidden;padding:2px 3px;font-weight:700;color:#2b241a;}" +
+".seatItem.k-table .seatSlot,.seatItem.k-round .seatSlot{background:rgba(255,255,255,0.45);border:1px dashed rgba(60,40,10,0.35);}" +
+".seatSlot.filled{cursor:grab;}" +
+".seatItem.k-desk .seatSlot.filled{padding-top:9px;}" +
+".seatName{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}" +
+".seatSlot.bad{box-shadow:inset 0 0 0 3px #e03131;}" +
+".seatSlot.dropHover{box-shadow:inset 0 0 0 3px #1f8f7d;background:rgba(31,143,125,0.25) !important;}" +
+".seatNum{position:absolute;left:3px;top:1px;font-size:9px;font-weight:800;opacity:.55;}" +
+".seatEmptyNum{font-size:15px;font-weight:800;opacity:.45;}" +
+".seatTableLbl{position:absolute;left:-20px;right:-20px;top:-17px;font-size:11px;font-weight:800;color:#5a4a32;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
+".seatTags{display:flex;gap:2px;margin-top:2px;flex-wrap:wrap;justify-content:center;}" +
+".seatTag{font-size:8px;line-height:11px;padding:0 3px;border-radius:5px;color:#fff;font-weight:800;}" +
+".seatLock{position:absolute;right:2px;top:1px;font-size:9px;}";
+
+var SEAT_ED_CSS =
+".seatEd{position:fixed;inset:0;z-index:1100;background:#141b26;display:flex;flex-direction:column;color:#e6ebf1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}" +
+".seatEdHead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:#1c2534;border-bottom:1px solid #2f3d52;}" +
+".seatEdHead h3{margin:0 6px 0 0;font-size:16px;}" +
+".seatEdHead select{border:1px solid #35455c;background:#242f42;color:#dce6f0;border-radius:8px;padding:7px;font-size:13px;font-family:inherit;}" +
+".seatTabs{display:flex;gap:3px;background:#0f151f;padding:3px;border-radius:9px;}" +
+".seatTab{border:none;background:transparent;color:#a9b8c9;padding:7px 12px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}" +
+".seatTab.on{background:#1f8f7d;color:#fff;}" +
+".seatEdMain{flex:1;min-height:0;display:flex;}" +
+".seatSide{width:300px;flex:none;overflow:auto;padding:12px;background:#18202d;border-right:1px solid #2f3d52;box-sizing:border-box;}" +
+".seatStage{flex:1;min-width:0;position:relative;}" +
+".seatEdHost{position:absolute;inset:26px 16px 16px 16px;}" +
+".seatBtn{border:1px solid #35455c;background:#242f42;color:#dce6f0;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}" +
+".seatBtn:hover{background:#2c3a52;}" +
+".seatBtn.go{background:#1f8f7d;border-color:#1f8f7d;color:#fff;}" +
+".seatBtn.warn{color:#ffb4a8;}" +
+".seatBtn.full{width:100%;margin-bottom:6px;}" +
+".seatPal{display:grid;grid-template-columns:1fr 1fr;gap:6px;}" +
+".seatPal .seatBtn{text-align:left;touch-action:none;}" +
+".seatSideH{font-size:11px;color:#8fa3ba;text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:16px 0 7px;}" +
+".seatSideH:first-child{margin-top:2px;}" +
+".seatHint{font-size:11px;color:#8fa3ba;line-height:1.45;margin-top:6px;}" +
+".seatSide input,.seatSide select,.seatSide textarea,.seatStuWrap input[type=text],.seatStuWrap select{box-sizing:border-box;background:#242f42;border:1px solid #35455c;color:#e6ebf1;border-radius:7px;padding:7px;font-size:13px;font-family:inherit;}" +
+".seatSide textarea,.seatSide .wide{width:100%;}" +
+".seatSide textarea{resize:vertical;}" +
+".seatRow{display:flex;gap:6px;align-items:center;margin-bottom:6px;}" +
+".seatRow > .grow{flex:1;min-width:0;}" +
+".seatTagEd{display:flex;gap:5px;align-items:center;margin-bottom:6px;}" +
+".seatTagEd .sw{width:12px;height:12px;border-radius:50%;flex:none;}" +
+".seatTagEd input{width:84px;flex:none;}" +
+".seatTagEd select{flex:1;min-width:0;}" +
+".seatX{border:none;background:transparent;color:#8fa3ba;font-size:15px;cursor:pointer;padding:2px 5px;}" +
+".seatX:hover{color:#ffb4a8;}" +
+".seatStuWrap{position:absolute;inset:0;overflow:auto;padding:16px;box-sizing:border-box;}" +
+".seatStuTop{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}" +
+".seatStuTop b{font-size:15px;margin-right:auto;}" +
+".seatStuTable{border-collapse:collapse;width:100%;font-size:13px;}" +
+".seatStuTable th{text-align:left;font-size:11px;color:#8fa3ba;text-transform:uppercase;letter-spacing:.4px;padding:6px;border-bottom:1px solid #2f3d52;white-space:nowrap;}" +
+".seatStuTable td{padding:5px 6px;border-bottom:1px solid #222d3e;}" +
+".seatStuTable td.c,.seatStuTable th.c{text-align:center;}" +
+".seatStuTable input[type=text]{width:100%;min-width:120px;max-width:260px;}" +
+".seatStuTable input[type=checkbox]{width:18px;height:18px;accent-color:#1f8f7d;}" +
+".seatStuEmpty{color:#8fa3ba;text-align:center;padding:40px 10px;font-size:14px;}" +
+".seatReport{font-size:12px;line-height:1.45;background:#0f151f;border-radius:8px;padding:8px 10px;}" +
+".seatReport div{padding:3px 0;}" +
+".seatReport .ok{color:#8ce99a;}" +
+".seatReport .no{color:#ffc9c0;}" +
+".seatTray{min-height:46px;background:#0f151f;border:1px dashed #35455c;border-radius:8px;padding:4px;}" +
+".seatChip{display:inline-block;background:#e9e3d3;color:#3d3528;border-radius:12px;padding:4px 9px;margin:3px;font-weight:700;font-size:12px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;}" +
+".seatGhost{position:fixed;z-index:1300;pointer-events:none;background:#1f8f7d;color:#fff;padding:6px 11px;border-radius:14px;font-weight:700;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.45);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}" +
+".seatCheck{display:flex;gap:7px;align-items:center;font-size:13px;margin:8px 0;cursor:pointer;}" +
+".seatCheck input{width:16px;height:16px;accent-color:#1f8f7d;}" +
+"@media (max-width:760px){.seatEdMain{flex-direction:column;}.seatSide{width:auto;max-height:40vh;border-right:none;border-bottom:1px solid #2f3d52;}.seatStage{min-height:50vh;}.seatEdHost{inset:22px 8px 8px 8px;}}";
+
+function seatCss(doc){
+  if (doc.getElementById("seatCss")) return;
+  var st = doc.createElement("style");
+  st.id = "seatCss";
+  st.textContent = SEAT_CSS + (doc === document ? SEAT_ED_CSS : "");
+  doc.head.appendChild(st);
+}
+
+function seatUid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function seatSnap(v){ return Math.round(v / 5) * 5; }
+function seatShuffle(a){ for (var i=a.length-1;i>0;i--){ var j = Math.floor(Math.random()*(i+1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+function seatState(){
+  if (!state.seating){
+    state.seating = {
+      items: [
+        { id: "si_board", kind: "board", x: 370, y: 0, w: 260, h: 18, label: "Whiteboard" },
+        { id: "si_door", kind: "door", x: 910, y: 0, w: 70, h: 18, label: "Door" },
+        { id: "si_teacher", kind: "teacher", x: 30, y: 36, w: 140, h: 70, label: "Teacher desk" }
+      ],
+      tags: [
+        { id: "glasses", name: "Glasses", kind: "yes", rule: "front", color: SEAT_TAG_COLORS[0] },
+        { id: "ell", name: "ELL", kind: "yes", rule: "together", color: SEAT_TAG_COLORS[1] },
+        { id: "talk", name: "Talkative", kind: "yes", rule: "apart", color: SEAT_TAG_COLORS[2] },
+        { id: "motiv", name: "Motivation", kind: "level", rule: "mix", color: SEAT_TAG_COLORS[3] }
+      ],
+      periods: {}
+    };
+  }
+  return state.seating;
+}
+
+function seatIsSeatKind(kind){ return kind === "desk" || kind === "table" || kind === "round"; }
+function seatItemLabel(it){ return (it.label != null && it.label !== "") ? it.label : ((SEAT_KINDS[it.kind] || {}).name || ""); }
+
+// seat spots inside one item, relative to the item's top-left corner
+function seatSlots(it){
+  if (it.kind === "desk") return [{ k: 0, x: 0, y: 0, w: it.w, h: it.h }];
+  if (it.kind !== "table" && it.kind !== "round") return [];
+  var n = Math.max(1, it.seats || 4), cols, rows;
+  if (it.kind === "round"){ cols = Math.ceil(Math.sqrt(n)); rows = Math.ceil(n / cols); }
+  else {
+    rows = n <= 2 ? 1 : 2; cols = Math.ceil(n / rows);
+    if (it.h > it.w){ var t = rows; rows = cols; cols = t; }
+  }
+  var pad = it.kind === "round" ? Math.min(it.w, it.h) * 0.16 : 5, gap = 4;
+  var cw = (it.w - pad*2 - gap*(cols-1)) / cols, ch = (it.h - pad*2 - gap*(rows-1)) / rows;
+  var out = [];
+  for (var k=0;k<n;k++){
+    var r = Math.floor(k / cols), c = k % cols;
+    out.push({ k: k, x: pad + c*(cw+gap), y: pad + r*(ch+gap), w: Math.max(4, cw), h: Math.max(4, ch) });
+  }
+  return out;
+}
+function seatSlotId(it, k){ return it.kind === "desk" ? it.id : it.id + "#" + k; }
+
+function seatList(){
+  var out = [], items = seatState().items;
+  for (var i=0;i<items.length;i++){
+    var it = items[i], sl = seatSlots(it);
+    for (var j=0;j<sl.length;j++){
+      var s = sl[j];
+      out.push({ id: seatSlotId(it, s.k), item: it, k: s.k, x: it.x + s.x, y: it.y + s.y, w: s.w, h: s.h });
+    }
+  }
+  return out;
+}
+function seatPlaceName(seat){
+  var it = seat.item;
+  return it.kind === "desk" ? "Desk " + seatItemLabel(it) : seatItemLabel(it) + ", seat " + (seat.k + 1);
+}
+function seatPlaceNameById(id){
+  var all = seatList();
+  for (var i=0;i<all.length;i++) if (all[i].id === id) return seatPlaceName(all[i]);
+  return "";
+}
+function seatRoomH(){
+  var items = seatState().items, m = 0;
+  for (var i=0;i<items.length;i++) m = Math.max(m, items[i].y + items[i].h);
+  return Math.max(SEAT_MIN_H, Math.ceil(m + 30));
+}
+function seatFindItem(id){
+  var items = seatState().items;
+  for (var i=0;i<items.length;i++) if (items[i].id === id) return items[i];
+  return null;
+}
+
+/* ---------- periods ---------- */
+function seatPeriodLabels(){ var l = cfuPeriodLabels(); return l.length ? l : ["My Class"]; }
+function seatNowPeriod(){
+  var sched = getActiveSchedule();
+  if (!sched || !sched.periods) return null;
+  var d = new Date(), mins = d.getHours()*60 + d.getMinutes();
+  for (var i=0;i<sched.periods.length;i++){
+    var p = sched.periods[i];
+    if (mins >= p.start && mins < p.end && !/lunch/i.test(p.label)) return p.label;
+  }
+  return null;
+}
+function seatShownPeriod(w){
+  if (w.period && w.period !== "auto") return w.period;
+  var labels = seatPeriodLabels(), last = seatState().lastPeriod;
+  return seatNowPeriod() || (last && labels.indexOf(last) !== -1 ? last : labels[0]);
+}
+function seatPer(label){
+  var ss = seatState();
+  if (!ss.periods[label]) ss.periods[label] = { students: [], seats: {} };
+  return ss.periods[label];
+}
+function seatStudent(per, id){
+  for (var i=0;i<per.students.length;i++) if (per.students[i].id === id) return per.students[i];
+  return null;
+}
+function seatOfStudent(per, id){
+  for (var k in per.seats) if (per.seats[k] === id) return k;
+  return null;
+}
+// drop seats whose desk was removed, students who were removed, and stale locks
+function seatSanitize(per){
+  var valid = {}, all = seatList(), byId = {}, used = {};
+  for (var i=0;i<all.length;i++) valid[all[i].id] = true;
+  for (var j=0;j<per.students.length;j++) byId[per.students[j].id] = per.students[j];
+  for (var k in per.seats){
+    var v = per.seats[k];
+    if (!valid[k] || !byId[v] || used[v]) delete per.seats[k];
+    else used[v] = true;
+  }
+  for (var s=0;s<per.students.length;s++){
+    var st = per.students[s];
+    if (st.lock && per.seats[st.lock] !== st.id) st.lock = null;
+  }
+}
+function seatRandomPlace(per, list){
+  var empties = seatShuffle(seatList().filter(function(s){ return !per.seats[s.id]; }));
+  for (var i=0;i<list.length && i<empties.length;i++) per.seats[empties[i].id] = list[i].id;
+}
+function seatMoveStudent(per, st, toSeat){
+  var from = seatOfStudent(per, st.id);
+  if (from === toSeat) return;
+  var otherId = toSeat ? per.seats[toSeat] : null;
+  if (from) delete per.seats[from];
+  if (toSeat) per.seats[toSeat] = st.id;
+  if (otherId && otherId !== st.id){
+    var other = seatStudent(per, otherId);
+    if (from) per.seats[from] = otherId;
+    if (other && other.lock) other.lock = from || null;
+  }
+  if (st.lock) st.lock = toSeat || null;
+}
+
+/* ---------- drawing ---------- */
+function seatTagChips(st){
+  var tags = seatState().tags, html = "";
+  for (var i=0;i<tags.length;i++){
+    var t = tags[i], v = st.tags ? st.tags[t.id] : null;
+    if (!v) continue;
+    var ab = t.name.length <= 4 ? t.name : t.name.slice(0, 4);
+    html += '<span class="seatTag" style="background:' + t.color + '">' + escapeHtml(ab) + (t.kind === "level" ? " " + v : "") + '</span>';
+  }
+  return html ? '<span class="seatTags">' + html + '</span>' : "";
+}
+
+// o: { period, mode: "view"|"room"|"seats", showTags, sel, bad }
+function seatDraw(room, o){
+  var ss = seatState(), doc = room.ownerDocument;
+  var per = o.period ? seatPer(o.period) : null, byId = {};
+  if (per) for (var b=0;b<per.students.length;b++) byId[per.students[b].id] = per.students[b];
+  room.innerHTML = "";
+  room.style.width = SEAT_W + "px";
+  room.style.height = seatRoomH() + "px";
+  var items = ss.items.slice().sort(function(a, c){ return (a.kind === "rug" ? 0 : 1) - (c.kind === "rug" ? 0 : 1); });
+  for (var i=0;i<items.length;i++){
+    var it = items[i], kd = SEAT_KINDS[it.kind] || {};
+    var el = doc.createElement("div");
+    el.className = "seatItem k-" + it.kind + (o.sel === it.id ? " sel" : "");
+    el.setAttribute("data-item", it.id);
+    el.style.cssText = "left:" + it.x + "px;top:" + it.y + "px;width:" + it.w + "px;height:" + it.h + "px;";
+    var slots = seatSlots(it);
+    if (!slots.length){
+      el.innerHTML = (kd.icon ? '<span class="seatIco">' + kd.icon + '</span>' : '') + '<span class="seatLbl">' + escapeHtml(seatItemLabel(it)) + '</span>';
+      el.title = seatItemLabel(it);
+    } else if (it.kind !== "desk"){
+      el.innerHTML = '<div class="seatTableLbl">' + escapeHtml(seatItemLabel(it)) + '</div>';
+    }
+    for (var s=0;s<slots.length;s++){
+      var sl = slots[s], sid = seatSlotId(it, sl.k);
+      var st = per && per.seats[sid] ? byId[per.seats[sid]] : null;
+      var se = doc.createElement("div");
+      se.className = "seatSlot" + (st ? " filled" : " empty") + (o.bad && o.bad[sid] ? " bad" : "");
+      se.setAttribute("data-seat", sid);
+      var fs = Math.max(8, Math.min(13, sl.w / 5.2));
+      var html = "", shown = "";
+      if (st){
+        var parts = st.name.split(/\s+/);
+        shown = st.name;
+        // small table seats: "Olivia M." fits where "Olivia Martinez" gets cut off
+        if (sl.w < (it.kind === "desk" ? 66 : 90) && parts.length > 1) shown = parts[0] + " " + parts[parts.length-1].charAt(0) + ".";
+        // shrink the text so the longest word fits on one line instead of breaking mid-word
+        var longest = 0;
+        shown.split(/\s+/).forEach(function(wd){ longest = Math.max(longest, wd.length); });
+        if (longest) fs = Math.max(7, Math.min(fs, (sl.w - 8) / (longest * 0.62)));
+        se.title = st.name;
+        html += '<span class="seatName">' + escapeHtml(shown) + '</span>';
+        if (o.showTags) html += seatTagChips(st);
+        if (o.mode === "seats" && st.lock === sid) html += '<span class="seatLock">🔒</span>';
+        if (it.kind === "desk") html += '<span class="seatNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
+      } else if (it.kind === "desk"){
+        html += '<span class="seatEmptyNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
+      }
+      se.style.cssText = "left:" + sl.x + "px;top:" + sl.y + "px;width:" + sl.w + "px;height:" + sl.h + "px;font-size:" + fs.toFixed(1) + "px;";
+      se.innerHTML = html;
+      el.appendChild(se);
+    }
+    if (o.mode === "room" && o.sel === it.id){
+      var rh = doc.createElement("div");
+      rh.className = "seatResize";
+      rh.title = "Drag to resize";
+      el.appendChild(rh);
+    }
+    room.appendChild(el);
+  }
+}
+
+// draws the room scaled to fit inside host and keeps it fitted as host resizes
+function seatMount(host, o){
+  var doc = host.ownerDocument, view = doc.defaultView;
+  var fit = doc.createElement("div"); fit.className = "seatFit";
+  var room = doc.createElement("div"); room.className = "seatRoom";
+  fit.appendChild(room); host.appendChild(fit);
+  var api = { room: room, scale: 1, o: o };
+  api.fitNow = function(){
+    var cw = host.clientWidth, ch = host.clientHeight;
+    if (!cw || !ch) return;
+    var H = parseFloat(room.style.height) || SEAT_MIN_H;
+    var s = Math.min(cw / SEAT_W, ch / H);
+    if (o.maxScale) s = Math.min(s, o.maxScale);
+    api.scale = s;
+    room.style.transform = "scale(" + s + ")";
+    fit.style.left = Math.max(0, (cw - SEAT_W*s) / 2) + "px";
+    fit.style.top = Math.max(0, (ch - H*s) / 2) + "px";
+  };
+  api.draw = function(){ seatDraw(room, o); api.fitNow(); };
+  api.toRoom = function(cx, cy){ var r = room.getBoundingClientRect(); return { x: (cx - r.left) / api.scale, y: (cy - r.top) / api.scale }; };
+  if (view.ResizeObserver) new view.ResizeObserver(function(){ api.fitNow(); }).observe(host);
+  api.draw();
+  return api;
+}
+
+/* ---------- rules: scoring an arrangement ---------- */
+function seatRectGap(a, b){
+  var dx = Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w)), dy = Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h));
+  return Math.sqrt(dx*dx + dy*dy);
+}
+function seatModel(){
+  var ss = seatState(), seats = seatList(), n = seats.length, idx = {};
+  for (var i=0;i<n;i++){ var s = seats[i]; idx[s.id] = i; s.cx = s.x + s.w/2; s.cy = s.y + s.h/2; }
+  // 0 = closest seat to the reference, 1 = farthest
+  function norm(d){
+    var mn = Infinity, mx = -Infinity;
+    for (var a=0;a<d.length;a++){ mn = Math.min(mn, d[a]); mx = Math.max(mx, d[a]); }
+    return d.map(function(v){ return mx > mn ? (v - mn) / (mx - mn) : 0; });
+  }
+  function distTo(kinds){
+    var refs = ss.items.filter(function(it){ return kinds.indexOf(it.kind) !== -1; });
+    if (!refs.length) return null;
+    return norm(seats.map(function(s){
+      var m = Infinity;
+      for (var r=0;r<refs.length;r++){
+        var rf = refs[r], dx = Math.max(rf.x - s.cx, 0, s.cx - (rf.x + rf.w)), dy = Math.max(rf.y - s.cy, 0, s.cy - (rf.y + rf.h));
+        // sitting off to the side matters less than sitting rows back from a long board
+        if (rf.w >= rf.h) dx *= 0.4; else dy *= 0.4;
+        m = Math.min(m, Math.sqrt(dx*dx + dy*dy));
+      }
+      return m;
+    }));
+  }
+  var front = distTo(["board", "screen"]) || norm(seats.map(function(s){ return s.cy; }));
+  var teacher = distTo(["teacher"]) || front;
+  var near = [], far = [];
+  for (var p=0;p<n;p++){
+    for (var q=p+1;q<n;q++){
+      if (seats[p].item === seats[q].item){ near.push([p, q]); continue; }
+      var g = seatRectGap(seats[p], seats[q]);
+      if (g <= SEAT_NEAR) near.push([p, q]);
+      else if (g <= SEAT_FAR) far.push([p, q]);
+    }
+  }
+  return { seats: seats, n: n, idx: idx, pos: { front: front, back: front.map(function(v){ return 1 - v; }), teacher: teacher }, near: near, far: far };
+}
+function seatActiveTags(){ return seatState().tags.filter(function(t){ return t.rule && t.rule !== "none"; }); }
+
+// lower is better. rep (optional) collects what is broken, for the report.
+function seatScore(m, assign, tags, rep){
+  var cost = 0, n = m.n, i, a, b, pr, tag, id, isLvl;
+  function val(st){
+    if (!st || !st.tags) return 0;
+    var v = st.tags[id];
+    return isLvl ? (parseInt(v, 10) || 0) : (v ? 1 : 0);
+  }
+  for (var t=0;t<tags.length;t++){
+    tag = tags[t]; id = tag.id; isLvl = tag.kind === "level";
+    var rule = tag.rule;
+    if (rule === "front" || rule === "back" || rule === "teacher"){
+      var arr = m.pos[rule];
+      for (i=0;i<assign.length;i++){
+        var v = val(assign[i]); if (!v) continue;
+        var p = i < n ? arr[i] : 1;
+        var wgt = isLvl ? (v === 1 ? 10 : (v === 2 ? 3 : 0)) : 10;
+        cost += wgt * p;
+        if (rep && wgt >= 10 && p > 0.34) rep(tag, "pos", [i]);
+      }
+    } else if (rule === "apart"){
+      for (i=0;i<m.near.length;i++){ pr = m.near[i]; if (val(assign[pr[0]]) && val(assign[pr[1]])){ cost += 25; if (rep) rep(tag, "pair", pr); } }
+      for (i=0;i<m.far.length;i++){ pr = m.far[i]; if (val(assign[pr[0]]) && val(assign[pr[1]])) cost += 4; }
+    } else if (rule === "together"){
+      var count = 0;
+      for (i=0;i<n;i++) if (val(assign[i])) count++;
+      if (count < 2) continue;
+      var has = [];
+      for (i=0;i<m.near.length;i++){ pr = m.near[i]; if (val(assign[pr[0]]) && val(assign[pr[1]])){ has[pr[0]] = true; has[pr[1]] = true; } }
+      for (i=0;i<n;i++) if (val(assign[i]) && !has[i]){ cost += 15; if (rep) rep(tag, "alone", [i]); }
+    } else if (rule === "mix"){
+      for (i=0;i<m.near.length;i++){
+        pr = m.near[i]; a = val(assign[pr[0]]); b = val(assign[pr[1]]);
+        if (a === 1 && b === 1){ cost += 10; if (rep) rep(tag, "pair", pr); }
+        else if (a && a === b) cost += 2;
+      }
+    }
+  }
+  return cost;
+}
+function seatNamesList(names){
+  if (names.length <= 4) return names.length > 1 ? names.slice(0, -1).join(", ") + " & " + names[names.length-1] : names[0];
+  return names.slice(0, 4).join(", ") + " and " + (names.length - 4) + " more";
+}
+function seatReport(per){
+  seatSanitize(per);
+  var m = seatModel(), byId = {}, assign = [];
+  for (var s=0;s<per.students.length;s++) byId[per.students[s].id] = per.students[s];
+  for (var i=0;i<m.n;i++) assign[i] = byId[per.seats[m.seats[i].id]] || null;
+  var groups = {}, bad = {};
+  seatScore(m, assign, seatActiveTags(), function(tag, type, list){
+    var g = groups[tag.id] || (groups[tag.id] = { tag: tag, pos: [], alone: [], pairs: [] });
+    for (var k=0;k<list.length;k++) bad[m.seats[list[k]].id] = true;
+    if (type === "pair") g.pairs.push(assign[list[0]].name + " & " + assign[list[1]].name);
+    else g[type].push(assign[list[0]].name);
+  });
+  var lines = [];
+  var seated = 0;
+  for (var j=0;j<m.n;j++) if (assign[j]) seated++;
+  var unseated = per.students.length - seated;
+  if (unseated > 0) lines.push(unseated + (unseated === 1 ? " student doesn't" : " students don't") + " have a seat yet." + (per.students.length > m.n ? " (" + m.n + " seats for " + per.students.length + " students.)" : ""));
+  for (var id in groups){
+    var g = groups[id], nm = g.tag.name, rule = g.tag.rule;
+    if (g.pos.length){
+      var where = rule === "front" ? "in the front third of the room" : rule === "back" ? "in the back third of the room" : "close to the teacher desk";
+      lines.push((g.tag.kind === "level" ? nm + " 1" : nm) + ": " + seatNamesList(g.pos) + (g.pos.length === 1 ? " isn't " : " aren't ") + where + ".");
+    }
+    if (g.alone.length) lines.push(nm + ": " + seatNamesList(g.alone) + (g.alone.length === 1 ? " has" : " have") + " no other " + nm + " student next to them.");
+    if (g.pairs.length){
+      var shown = g.pairs.slice(0, 4).join("; ") + (g.pairs.length > 4 ? "; and " + (g.pairs.length - 4) + " more" : "");
+      lines.push(nm + (rule === "mix" ? ": both 1s side by side: " : ": side by side: ") + shown + ".");
+    }
+  }
+  return { lines: lines, bad: bad, seated: seated, total: per.students.length, seats: m.n };
+}
+
+// withRules false = plain random shuffle. Locked students stay put either way.
+function seatArrange(per, withRules){
+  seatSanitize(per);
+  var m = seatModel(), n = m.n;
+  if (!n) return false;
+  var assign = [], fixed = {}, free = [], i;
+  for (i=0;i<n;i++) assign[i] = null;
+  for (i=0;i<per.students.length;i++){
+    var st = per.students[i], li = st.lock ? m.idx[st.lock] : undefined;
+    if (li !== undefined && !assign[li]){ assign[li] = st; fixed[li] = true; }
+    else { st.lock = null; free.push(st); }
+  }
+  var open = [];
+  for (i=0;i<n;i++) if (!fixed[i]) open.push(i);
+  while (open.length < free.length){ open.push(assign.length); assign.push(null); } // not enough seats: the rest sit out
+  function randomFill(){
+    for (var a=0;a<open.length;a++) assign[open[a]] = null;
+    var spots = seatShuffle(open.slice());
+    for (var f=0;f<free.length;f++) assign[spots[f]] = free[f];
+  }
+  randomFill();
+  var tags = seatActiveTags();
+  if (withRules && tags.length && open.length > 1){
+    var best = assign.slice(), bestC = seatScore(m, assign, tags);
+    for (var r=0;r<6 && bestC > 0;r++){
+      if (r) randomFill();
+      var cur = seatScore(m, assign, tags), T = 10;
+      if (cur < bestC){ bestC = cur; best = assign.slice(); }
+      for (var it=0;it<4000;it++, T *= 0.9988){
+        var x = open[Math.floor(Math.random()*open.length)], y = open[Math.floor(Math.random()*open.length)];
+        if (x === y || (!assign[x] && !assign[y])) continue;
+        var tmp = assign[x]; assign[x] = assign[y]; assign[y] = tmp;
+        var c = seatScore(m, assign, tags);
+        if (c <= cur || Math.random() < Math.exp((cur - c) / T)){
+          cur = c;
+          if (c < bestC){ bestC = c; best = assign.slice(); if (!c) break; }
+        } else { tmp = assign[x]; assign[x] = assign[y]; assign[y] = tmp; }
+      }
+    }
+    assign = best;
+  }
+  per.seats = {};
+  for (i=0;i<n;i++) if (assign[i]) per.seats[m.seats[i].id] = assign[i].id;
+  saveState();
+  return true;
+}
+
+/* ---------- room editing helpers ---------- */
+function seatOverlaps(x, y, w, h, skipId){
+  var items = seatState().items;
+  for (var i=0;i<items.length;i++){
+    var it = items[i];
+    if (it.id === skipId || it.kind === "rug") continue;
+    if (x < it.x + it.w + 14 && x + w + 14 > it.x && y < it.y + it.h + 22 && y + h + 22 > it.y) return true;
+  }
+  return false;
+}
+function seatFreeSpot(w, h){
+  for (var y=40;y<3000;y+=10){
+    for (var x=20;x + w <= SEAT_W - 10;x+=10){ if (!seatOverlaps(x, y, w, h)) return { x: x, y: y }; }
+  }
+  return { x: 20, y: seatRoomH() };
+}
+function seatNextNumber(kind){
+  var items = seatState().items, mx = 0;
+  for (var i=0;i<items.length;i++){
+    var it = items[i];
+    if (kind === "desk" ? it.kind !== "desk" : !(it.kind === "table" || it.kind === "round")) continue;
+    var mm = String(it.label || "").match(/(\d+)\s*$/);
+    if (mm) mx = Math.max(mx, parseInt(mm[1], 10));
+  }
+  return mx + 1;
+}
+function seatNewItem(spec, x, y){
+  var ss = seatState(), kd = SEAT_KINDS[spec.kind];
+  var it = { id: seatUid("si_"), kind: spec.kind, w: spec.w || kd.w, h: spec.h || kd.h, x: 0, y: 0 };
+  if (spec.kind === "table" || spec.kind === "round") it.seats = spec.seats || kd.seats;
+  if (spec.kind === "desk") it.label = String(seatNextNumber("desk"));
+  else if (it.seats) it.label = "Table " + seatNextNumber("table");
+  else it.label = kd.name;
+  if (x == null){ var p = seatFreeSpot(it.w, it.h); x = p.x; y = p.y; }
+  else { x -= it.w / 2; y -= it.h / 2; }
+  it.x = Math.max(0, Math.min(SEAT_W - it.w, seatSnap(x)));
+  it.y = Math.max(0, seatSnap(y));
+  ss.items.push(it);
+  return it;
+}
+function seatAddDeskGrid(n){
+  n = Math.max(1, Math.min(80, n|0));
+  var cols = Math.min(6, n), rows = Math.ceil(n / cols), sx = 118, sy = 92, dw = 80, dh = 56;
+  var gw = (cols-1)*sx + dw, gh = (rows-1)*sy + dh;
+  var x0 = Math.round((SEAT_W - gw) / 2), y0 = 130;
+  while (y0 < 3000 && seatOverlaps(x0, y0, gw, gh)) y0 += 10;
+  var num = seatNextNumber("desk");
+  for (var i=0;i<n;i++){
+    seatState().items.push({ id: seatUid("si_"), kind: "desk", x: x0 + (i % cols)*sx, y: y0 + Math.floor(i / cols)*sy, w: dw, h: dh, label: String(num + i) });
+  }
+}
+function seatAddOneDesk(){
+  var desks = seatState().items.filter(function(it){ return it.kind === "desk"; });
+  var last = null;
+  for (var i=0;i<desks.length;i++) if (!last || (parseInt(desks[i].label, 10) || 0) >= (parseInt(last.label, 10) || 0)) last = desks[i];
+  if (last){
+    var tries = [[last.x + last.w + 38, last.y]];
+    var rowStart = Math.min.apply(null, desks.map(function(d){ return d.x; }));
+    tries.push([rowStart, last.y + last.h + 36]);
+    for (var t=0;t<tries.length;t++){
+      var x = tries[t][0], y = tries[t][1];
+      if (x + last.w <= SEAT_W && !seatOverlaps(x, y, last.w, last.h)){
+        var it = seatNewItem({ kind: "desk", w: last.w, h: last.h });
+        it.x = x; it.y = y;
+        return it;
+      }
+    }
+  }
+  return seatNewItem({ kind: "desk" });
+}
+// desks 1..N and tables 1..N, front row first, left to right
+function seatRenumber(){
+  var m = seatModel(), items = seatState().items, frontOf = {};
+  for (var i=0;i<m.n;i++){ var id = m.seats[i].item.id; frontOf[id] = Math.min(frontOf[id] === undefined ? 1 : frontOf[id], m.pos.front[i]); }
+  function order(list){
+    return list.sort(function(a, b){
+      var ra = Math.round(frontOf[a.id] * 8), rb = Math.round(frontOf[b.id] * 8);
+      return ra !== rb ? ra - rb : (Math.abs(a.y - b.y) > 30 ? a.y - b.y : a.x - b.x);
+    });
+  }
+  order(items.filter(function(it){ return it.kind === "desk"; })).forEach(function(it, k){ it.label = String(k + 1); });
+  order(items.filter(function(it){ return it.kind === "table" || it.kind === "round"; })).forEach(function(it, k){ it.label = "Table " + (k + 1); });
+}
+
+// track a pointer drag; onMove(dx, dy, ev) only once it has moved a few pixels
+function seatTrack(e, onMove, onUp){
+  var sx = e.clientX, sy = e.clientY, moved = false;
+  function mv(ev){
+    var dx = ev.clientX - sx, dy = ev.clientY - sy;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true;
+    ev.preventDefault();
+    onMove(dx, dy, ev);
+  }
+  function up(ev){
+    window.removeEventListener("pointermove", mv);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    onUp(moved, ev);
+  }
+  window.addEventListener("pointermove", mv, { passive: false });
+  window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+}
+function seatGhost(text){
+  var g = document.createElement("div");
+  g.className = "seatGhost";
+  g.textContent = text;
+  document.body.appendChild(g);
+  return g;
+}
+function seatParseNames(raw){
+  var lines = String(raw || "").split(/\n/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
+  if (lines.length === 1 && lines[0].indexOf(",") !== -1) lines = lines[0].split(",").map(function(s){ return s.trim(); }).filter(function(s){ return s; });
+  return lines;
+}
+
+/* ---------- printing ---------- */
+function seatPrintDialog(period){
+  var overlay = document.createElement("div");
+  overlay.className = "modalOverlay";
+  overlay.style.zIndex = 1200;
+  var card = document.createElement("div");
+  card.className = "modalCard promptCard";
+  card.innerHTML = "<h3>Print " + escapeHtml(period) + " seating chart</h3>" +
+    '<button class="exportBtn pA">Names only (for the room or a sub)</button>' +
+    '<button class="exportBtn pB" style="background:#7048e8 !important;">Private copy with tags</button>' +
+    '<div class="comingSoonNote" style="margin-bottom:10px;">Page 2 lists every student and their seat. Choose "Save as PDF" in the print window to keep a file.</div>' +
+    '<button class="modalCloseBtn">Cancel</button>';
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  function close(){ if (overlay.parentNode) document.body.removeChild(overlay); }
+  card.querySelector(".pA").onclick = function(){ close(); seatPrint(period, false); };
+  card.querySelector(".pB").onclick = function(){ close(); seatPrint(period, true); };
+  card.querySelector(".modalCloseBtn").onclick = close;
+  overlay.onclick = function(e){ if (e.target === overlay) close(); };
+}
+function seatPrint(period, withTags){
+  var pop = window.open("", "seatprint_" + Date.now(), "width=1100,height=850");
+  if (!pop){ alert("Pop-up blocked. Please allow pop-ups for this page to print the seating chart."); return; }
+  var per = seatPer(period), H = seatRoomH(), s = Math.min(980 / SEAT_W, 600 / H);
+  seatSanitize(per);
+  var rows = per.students.slice().sort(function(a, b){ return a.name.localeCompare(b.name); }).map(function(st){
+    var seat = seatOfStudent(per, st.id);
+    return "<div class='rr'><b>" + escapeHtml(st.name) + "</b> &mdash; " + (seat ? escapeHtml(seatPlaceNameById(seat)) : "no seat") +
+      (withTags ? " " + seatTagChips(st) : "") + "</div>";
+  }).join("");
+  var legend = "";
+  if (withTags){
+    legend = "<div class='lg'>" + seatState().tags.map(function(t){
+      return "<span class='seatTag' style='background:" + t.color + "'>" + escapeHtml(t.name.length <= 4 ? t.name : t.name.slice(0, 4)) + "</span> " + escapeHtml(t.name) + (t.kind === "level" ? " (1 low - 3 high)" : "");
+    }).join(" &nbsp; ") + "</div>";
+  }
+  var d = new Date();
+  pop.document.write("<!DOCTYPE html><html><head><meta charset='utf-8'><title>Seating Chart - " + escapeHtml(period) + "</title><style>" + SEAT_CSS +
+    "body{margin:0;padding:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#222;background:#fff;}" +
+    "h1{font-size:18px;margin:0 0 2px;}.meta{font-size:12px;color:#666;margin-bottom:10px;}.lg{font-size:12px;margin-top:10px;}" +
+    ".lg .seatTag,.rr .seatTag{font-size:10px;line-height:14px;padding:0 4px;}.rr .seatTags{display:inline-flex;margin:0 0 0 4px;vertical-align:middle;}" +
+    ".roster{page-break-before:always;columns:2;font-size:13px;}.roster h2{column-span:all;font-size:16px;}.rr{padding:3px 0;break-inside:avoid;}" +
+    "@page{size:landscape;margin:10mm;}</style></head><body>" +
+    "<h1>Seating Chart &mdash; " + escapeHtml(period) + (withTags ? " (private: includes student tags)" : "") + "</h1>" +
+    "<div class='meta'>" + escapeHtml(d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })) + " &middot; " + per.students.length + " students</div>" +
+    "<div id='host' style='position:relative;width:" + Math.round(SEAT_W * s) + "px;height:" + Math.round(H * s) + "px;'></div>" + legend +
+    "<div class='roster'><h2>Students A&ndash;Z</h2>" + (rows || "<div>No students yet.</div>") + "</div></body></html>");
+  pop.document.close();
+  var host = pop.document.getElementById("host");
+  var room = pop.document.createElement("div");
+  room.className = "seatRoom";
+  room.style.transform = "scale(" + s + ")";
+  host.appendChild(room);
+  seatDraw(room, { period: period, mode: "view", showTags: withTags });
+  setTimeout(function(){ try { pop.focus(); pop.print(); } catch(e){} }, 350);
+}
+
+/* ---------- the window on the board ---------- */
+function buildSeatBody(w){
+  seatCss(document);
+  var wrap = document.createElement("div");
+  wrap.className = "seatWinBody";
+  var bar = document.createElement("div");
+  bar.className = "seatWinBar";
+  var sel = document.createElement("select");
+  sel.title = "Which class period to show";
+  var editB = document.createElement("button");
+  editB.className = "seatWinBtn"; editB.textContent = "✏️ Edit";
+  var printB = document.createElement("button");
+  printB.className = "seatWinBtn alt"; printB.textContent = "🖨"; printB.title = "Print or save as PDF";
+  bar.appendChild(sel); bar.appendChild(editB); bar.appendChild(printB);
+  wrap.appendChild(bar);
+  var host = document.createElement("div");
+  host.className = "seatFitHost";
+  wrap.appendChild(host);
+  var empty = document.createElement("div");
+  empty.className = "seatWinEmpty";
+
+  function fillSel(){
+    var now = seatNowPeriod();
+    var html = '<option value="auto">Current period' + (now ? " (" + escapeHtml(now) + ")" : "") + '</option>';
+    var labels = seatPeriodLabels();
+    if (w.period && w.period !== "auto" && labels.indexOf(w.period) === -1) labels = labels.concat([w.period]);
+    for (var i=0;i<labels.length;i++) html += '<option value="' + escapeHtml(labels[i]) + '">' + escapeHtml(labels[i]) + '</option>';
+    sel.innerHTML = html;
+    sel.value = w.period || "auto";
+  }
+  var o = { period: seatShownPeriod(w), mode: "view", showTags: false };
+  var api = seatMount(host, o);
+  function updEmpty(){
+    var hasSeats = seatList().length > 0;
+    empty.textContent = hasSeats ? "" : "No desks yet. Click Edit to draw your room and add students.";
+    if (!hasSeats && !empty.parentNode) host.appendChild(empty);
+    if (hasSeats && empty.parentNode) host.removeChild(empty);
+  }
+  fillSel(); updEmpty();
+  sel.onchange = function(){ w.period = sel.value; saveState(); o.period = seatShownPeriod(w); api.draw(); };
+  editB.onclick = function(){ seatOpenEditor(seatShownPeriod(w)); };
+  empty.onclick = editB.onclick;
+  printB.onclick = function(){ seatPrintDialog(seatShownPeriod(w)); };
+  var iv = setInterval(function(){
+    if (!wrap.isConnected){ clearInterval(iv); return; }
+    var p = seatShownPeriod(w);
+    if (p !== o.period){ o.period = p; api.draw(); fillSel(); }
+  }, 30000);
+  return wrap;
+}
+
+/* ---------- full-screen editor ---------- */
+function seatOpenEditor(period){
+  seatCss(document);
+  var ss = seatState();
+  var labels = seatPeriodLabels();
+  var ed = { period: period || labels[0], sel: null, showTags: true, mode: "room", busy: false };
+  if (seatList().length) ed.mode = seatPer(ed.period).students.length ? "seats" : "students";
+
+  var root = document.createElement("div");
+  root.className = "seatEd";
+  root.innerHTML =
+    '<div class="seatEdHead">' +
+      '<h3>🪑 Seating Chart</h3>' +
+      '<select class="seatEdPer" title="Class period"></select>' +
+      '<div class="seatTabs"><button class="seatTab" data-m="room">1 · Room</button><button class="seatTab" data-m="students">2 · Students</button><button class="seatTab" data-m="seats">3 · Seats</button></div>' +
+      '<div style="flex:1"></div>' +
+      '<button class="seatBtn seatEdPrint">🖨 Print</button>' +
+      '<button class="seatBtn go seatEdDone">Done</button>' +
+    '</div>' +
+    '<div class="seatEdMain"><div class="seatSide"></div><div class="seatStage"><div class="seatFitHost seatEdHost"></div><div class="seatStuWrap"></div></div></div>';
+  document.body.appendChild(root);
+  var side = root.querySelector(".seatSide"), host = root.querySelector(".seatEdHost"), stuWrap = root.querySelector(".seatStuWrap");
+  var perSel = root.querySelector(".seatEdPer");
+
+  function fillPer(){
+    var l = seatPeriodLabels();
+    if (l.indexOf(ed.period) === -1) l = l.concat([ed.period]);
+    perSel.innerHTML = l.map(function(x){ return '<option value="' + escapeHtml(x) + '">' + escapeHtml(x) + '</option>'; }).join("");
+    perSel.value = ed.period;
+  }
+  fillPer();
+  perSel.onchange = function(){ ed.period = perSel.value; ss.lastPeriod = ed.period; saveState(); render(); };
+  var tabs = root.querySelectorAll(".seatTab");
+  for (var ti=0;ti<tabs.length;ti++){
+    tabs[ti].onclick = function(){ ed.mode = this.getAttribute("data-m"); ed.sel = null; render(); };
+  }
+  root.querySelector(".seatEdPrint").onclick = function(){ seatPrintDialog(ed.period); };
+  function close(){
+    document.removeEventListener("keydown", onKey);
+    if (root.parentNode) document.body.removeChild(root);
+    saveState();
+    renderAll();
+  }
+  root.querySelector(".seatEdDone").onclick = close;
+
+  var o = { period: ed.period, mode: ed.mode, showTags: true, sel: null, bad: null, maxScale: 1.4 };
+  var api = seatMount(host, o);
+  var rep = null;
+  function per(){ return seatPer(ed.period); }
+  function redraw(){
+    o.period = ed.period; o.mode = ed.mode; o.sel = ed.sel; o.showTags = ed.showTags; o.bad = null;
+    seatSanitize(per());
+    if (ed.mode === "seats"){ rep = seatReport(per()); o.bad = rep.bad; }
+    api.draw();
+  }
+  function render(){
+    for (var i=0;i<tabs.length;i++) tabs[i].classList.toggle("on", tabs[i].getAttribute("data-m") === ed.mode);
+    var stu = ed.mode === "students";
+    host.style.display = stu ? "none" : "";
+    stuWrap.style.display = stu ? "" : "none";
+    if (stu) buildStudents(); else redraw();
+    side.innerHTML = "";
+    if (ed.mode === "room") buildRoomSide();
+    else if (stu) buildStudentSide();
+    else buildSeatSide();
+  }
+  function el(tag, cls, html){ var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function btn(label, cls, fn){ var b = el("button", "seatBtn" + (cls ? " " + cls : ""), label); b.type = "button"; b.onclick = fn; return b; }
+  function head(txt){ side.appendChild(el("div", "seatSideH", escapeHtml(txt))); }
+  function hint(txt){ side.appendChild(el("div", "seatHint", txt)); }
+
+  /* ----- 1. Room ----- */
+  function buildRoomSide(){
+    head("Quick start");
+    var r1 = el("div", "seatRow");
+    var nIn = el("input"); nIn.type = "number"; nIn.min = 1; nIn.max = 80; nIn.value = 30; nIn.style.width = "70px";
+    r1.appendChild(nIn);
+    r1.appendChild(btn("Add desks", "go grow", function(){ seatAddDeskGrid(parseInt(nIn.value, 10) || 30); saveState(); render(); }));
+    side.appendChild(r1);
+    var r2 = el("div", "seatRow");
+    r2.appendChild(btn("+ 1 desk", "grow", function(){ var it = seatAddOneDesk(); ed.sel = it.id; saveState(); render(); }));
+    r2.appendChild(btn("Renumber", "grow", function(){ seatRenumber(); saveState(); render(); }));
+    side.appendChild(r2);
+    hint("Desks are numbered as you add them. Renumber counts from the front row back, left to right.");
+
+    var it = ed.sel ? seatFindItem(ed.sel) : null;
+    if (it){
+      head("Selected: " + (SEAT_KINDS[it.kind] || {}).name);
+      var nm = el("input", "wide"); nm.type = "text"; nm.value = it.label || ""; nm.placeholder = "Name or number";
+      nm.oninput = function(){ it.label = nm.value; saveState(); redraw(); };
+      var r3 = el("div", "seatRow"); r3.appendChild(nm); side.appendChild(r3);
+      if (it.kind === "table" || it.kind === "round"){
+        var r4 = el("div", "seatRow");
+        r4.appendChild(el("span", "", "Seats"));
+        var sc = el("select", "grow");
+        for (var n=1;n<=10;n++) sc.innerHTML += '<option value="' + n + '">' + n + '</option>';
+        sc.value = it.seats || 4;
+        sc.onchange = function(){ it.seats = parseInt(sc.value, 10); saveState(); redraw(); };
+        r4.appendChild(sc);
+        side.appendChild(r4);
+      }
+      var r5 = el("div", "seatRow");
+      r5.appendChild(btn("⟳ Rotate", "grow", function(){
+        var cx = it.x + it.w/2, cy = it.y + it.h/2, t = it.w; it.w = it.h; it.h = t;
+        it.x = Math.max(0, Math.min(SEAT_W - it.w, seatSnap(cx - it.w/2))); it.y = Math.max(0, seatSnap(cy - it.h/2));
+        saveState(); redraw();
+      }));
+      r5.appendChild(btn("Copy", "grow", function(){
+        var c = seatNewItem({ kind: it.kind, w: it.w, h: it.h, seats: it.seats });
+        if (!seatIsSeatKind(it.kind)) c.label = it.label;
+        if (!seatOverlaps(it.x + it.w + 20, it.y, it.w, it.h, c.id) && it.x + it.w*2 + 20 <= SEAT_W){ c.x = it.x + it.w + 20; c.y = it.y; }
+        ed.sel = c.id; saveState(); render();
+      }));
+      r5.appendChild(btn("Delete", "warn grow", function(){ deleteSel(); }));
+      side.appendChild(r5);
+      hint("Drag to move. Drag the green dot to resize. Arrow keys nudge; Delete removes.");
+    }
+
+    for (var g=0;g<SEAT_PALETTE.length;g++){
+      head(SEAT_PALETTE[g].group === "Seats" ? "Seats & tables" : "Room items");
+      var pal = el("div", "seatPal");
+      SEAT_PALETTE[g].items.forEach(function(spec){
+        var kd = SEAT_KINDS[spec.kind];
+        var b = el("button", "seatBtn", (kd.icon ? kd.icon + " " : "") + escapeHtml(spec.name));
+        b.type = "button";
+        b.title = "Drag onto the room, or click to add";
+        b.onpointerdown = function(e){ paletteDrag(e, spec); };
+        pal.appendChild(b);
+      });
+      side.appendChild(pal);
+    }
+    hint("Drag an item onto the room, or click it to drop it in an open spot. Front of the room = closest to the whiteboard or screen.");
+    side.appendChild(el("div", "seatSideH", "Start over"));
+    side.appendChild(btn("Clear the whole room", "warn full", function(){
+      showConfirm("Remove every desk, table and room item? Students stay on your lists but lose their seats.", function(ok){
+        if (!ok) return;
+        ss.items = []; ed.sel = null; saveState(); render();
+      });
+    }));
+  }
+  function deleteSel(){
+    var it = ed.sel ? seatFindItem(ed.sel) : null;
+    if (!it) return;
+    ss.items.splice(ss.items.indexOf(it), 1);
+    ed.sel = null; saveState(); render();
+  }
+  function paletteDrag(e, spec){
+    e.preventDefault();
+    var ghost = null;
+    seatTrack(e, function(dx, dy, ev){
+      if (!ghost) ghost = seatGhost(spec.name);
+      ghost.style.left = (ev.clientX + 10) + "px"; ghost.style.top = (ev.clientY + 10) + "px";
+    }, function(moved, ev){
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      var it = null;
+      if (!moved) it = seatNewItem(spec);
+      else {
+        var r = host.getBoundingClientRect();
+        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom){
+          var p = api.toRoom(ev.clientX, ev.clientY);
+          it = seatNewItem(spec, p.x, p.y);
+        }
+      }
+      if (it){ ed.sel = it.id; saveState(); render(); }
+    });
+  }
+  function roomDown(e){
+    var itEl = e.target.closest ? e.target.closest("[data-item]") : null;
+    if (!itEl){ if (ed.sel){ ed.sel = null; render(); } return; }
+    var it = seatFindItem(itEl.getAttribute("data-item"));
+    if (!it) return;
+    e.preventDefault();
+    if (e.target.closest(".seatResize")){
+      var ow = it.w, oh = it.h;
+      seatTrack(e, function(dx, dy){
+        var minW = seatIsSeatKind(it.kind) ? 40 : 16, minH = seatIsSeatKind(it.kind) ? 30 : 8;
+        it.w = Math.max(minW, Math.min(SEAT_W - it.x, seatSnap(ow + dx / api.scale)));
+        it.h = Math.max(minH, seatSnap(oh + dy / api.scale));
+        if (it.kind === "round"){ var sq = Math.max(it.w, it.h); it.w = Math.min(sq, SEAT_W - it.x); it.h = it.w; }
+        redraw();
+      }, function(){ saveState(); render(); });
+      return;
+    }
+    var changed = ed.sel !== it.id;
+    ed.sel = it.id;
+    if (changed) render();
+    var ox = it.x, oy = it.y;
+    seatTrack(e, function(dx, dy){
+      it.x = Math.max(0, Math.min(SEAT_W - it.w, seatSnap(ox + dx / api.scale)));
+      it.y = Math.max(0, seatSnap(oy + dy / api.scale));
+      var node = api.room.querySelector('[data-item="' + it.id + '"]');
+      if (node){ node.style.left = it.x + "px"; node.style.top = it.y + "px"; }
+    }, function(moved){ if (moved){ saveState(); redraw(); } });
+  }
+  function onKey(e){
+    if (!root.parentNode) return;
+    var tg = e.target && e.target.tagName;
+    if (tg === "INPUT" || tg === "TEXTAREA" || tg === "SELECT") return;
+    if (e.key === "Escape"){ if (document.querySelector(".modalOverlay")) return; close(); return; }
+    if (ed.mode !== "room" || !ed.sel) return;
+    var it = seatFindItem(ed.sel); if (!it) return;
+    if (e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); deleteSel(); return; }
+    var mv = { ArrowLeft: [-5,0], ArrowRight: [5,0], ArrowUp: [0,-5], ArrowDown: [0,5] }[e.key];
+    if (mv){
+      e.preventDefault();
+      it.x = Math.max(0, Math.min(SEAT_W - it.w, it.x + mv[0])); it.y = Math.max(0, it.y + mv[1]);
+      saveState(); redraw();
+    }
+  }
+  document.addEventListener("keydown", onKey);
+
+  /* ----- 2. Students ----- */
+  function buildStudentSide(){
+    var p = per();
+    head("Add students to " + ed.period);
+    var ta = el("textarea"); ta.rows = 7; ta.placeholder = "Paste names, one per line";
+    side.appendChild(ta);
+    var addB = btn("Add & seat randomly", "go full", function(){
+      var names = seatParseNames(ta.value);
+      if (!names.length) return;
+      var have = {}; p.students.forEach(function(s){ have[s.name.toLowerCase()] = true; });
+      var added = [];
+      names.forEach(function(nm){
+        if (have[nm.toLowerCase()]) return;
+        have[nm.toLowerCase()] = true;
+        var st = { id: seatUid("st_"), name: nm, tags: {}, lock: null };
+        p.students.push(st); added.push(st);
+      });
+      seatRandomPlace(p, added);
+      saveState(); render();
+    });
+    addB.style.marginTop = "6px";
+    side.appendChild(addB);
+    var sw = getWinByType("signin");
+    if (sw && sw.roster && sw.roster.length){
+      side.appendChild(btn("Add the " + sw.roster.length + " from Student Sign-In", "full", function(){ ta.value = sw.roster.join("\n"); addB.onclick(); }));
+    }
+    var others = Object.keys(ss.periods).filter(function(k){ return k !== ed.period && ss.periods[k].students.length; });
+    if (others.length && !p.students.length){
+      var r = el("div", "seatRow");
+      var cs = el("select", "grow");
+      cs.innerHTML = others.map(function(k){ return '<option value="' + escapeHtml(k) + '">' + escapeHtml(k) + '</option>'; }).join("");
+      r.appendChild(cs);
+      r.appendChild(btn("Copy list", "", function(){
+        var src = ss.periods[cs.value], added = [];
+        src.students.forEach(function(s){ var c = { id: seatUid("st_"), name: s.name, tags: JSON.parse(JSON.stringify(s.tags || {})), lock: null }; p.students.push(c); added.push(c); });
+        seatRandomPlace(p, added); saveState(); render();
+      }));
+      side.appendChild(el("div", "seatHint", "Or copy the list from another period:"));
+      side.appendChild(r);
+    }
+    if (!seatList().length) hint("No seats yet: add desks or tables in 1 · Room and students will be seated there.");
+
+    head("Tags & seating rules");
+    ss.tags.forEach(function(t){
+      var row = el("div", "seatTagEd");
+      var sw2 = el("span", "sw"); sw2.style.background = t.color; row.appendChild(sw2);
+      var ni = el("input"); ni.type = "text"; ni.value = t.name; ni.title = t.kind === "level" ? "Level tag (1 low - 3 high)" : "Yes/no tag";
+      ni.onchange = function(){ if (ni.value.trim()){ t.name = ni.value.trim(); saveState(); render(); } };
+      row.appendChild(ni);
+      var rs = el("select");
+      (t.kind === "level" ? SEAT_RULES_LEVEL : SEAT_RULES_YES).forEach(function(rr){ rs.innerHTML += '<option value="' + rr[0] + '">' + rr[1] + '</option>'; });
+      rs.value = t.rule || "none";
+      rs.onchange = function(){ t.rule = rs.value; saveState(); };
+      row.appendChild(rs);
+      var x = el("button", "seatX", "✕"); x.type = "button"; x.title = "Delete this tag";
+      x.onclick = function(){
+        showConfirm('Delete the "' + t.name + '" tag from every student?', function(ok){
+          if (!ok) return;
+          ss.tags.splice(ss.tags.indexOf(t), 1);
+          for (var k in ss.periods) ss.periods[k].students.forEach(function(s){ if (s.tags) delete s.tags[t.id]; });
+          saveState(); render();
+        });
+      };
+      row.appendChild(x);
+      side.appendChild(row);
+    });
+    var nr = el("div", "seatRow");
+    var nt = el("input", "grow"); nt.type = "text"; nt.placeholder = "New tag, e.g. IEP";
+    var nk = el("select"); nk.innerHTML = '<option value="yes">Yes / no</option><option value="level">Level 1-3</option>';
+    nr.appendChild(nt); nr.appendChild(nk);
+    nr.appendChild(btn("Add", "", function(){
+      var nmv = nt.value.trim(); if (!nmv) return;
+      ss.tags.push({ id: seatUid("tg_"), name: nmv, kind: nk.value, rule: "none", color: SEAT_TAG_COLORS[ss.tags.length % SEAT_TAG_COLORS.length] });
+      saveState(); render();
+    }));
+    side.appendChild(nr);
+    hint("Tags and rules apply to every period. Tags only show here and on the private printout; the chart on your board shows names only.");
+  }
+  function buildStudents(){
+    var p = per();
+    stuWrap.innerHTML = "";
+    var top = el("div", "seatStuTop");
+    top.appendChild(el("b", "", p.students.length + " student" + (p.students.length === 1 ? "" : "s") + " in " + escapeHtml(ed.period)));
+    if (p.students.length){
+      top.appendChild(btn("Sort A–Z", "", function(){ p.students.sort(function(a, b){ return a.name.localeCompare(b.name); }); saveState(); render(); }));
+      top.appendChild(btn("Remove all", "warn", function(){
+        showConfirm("Remove all " + p.students.length + " students from " + ed.period + "?", function(ok){ if (!ok) return; p.students = []; p.seats = {}; saveState(); render(); });
+      }));
+    }
+    stuWrap.appendChild(top);
+    if (!p.students.length){
+      stuWrap.appendChild(el("div", "seatStuEmpty", "No students in " + escapeHtml(ed.period) + " yet.<br>Paste their names on the left."));
+      return;
+    }
+    var tbl = el("table", "seatStuTable");
+    var h = "<thead><tr><th>#</th><th>Name</th>";
+    ss.tags.forEach(function(t){ h += '<th class="c"><span style="color:' + t.color + '">●</span> ' + escapeHtml(t.name) + '</th>'; });
+    h += "<th>Seat</th><th></th></tr></thead>";
+    tbl.innerHTML = h;
+    var tb = el("tbody");
+    p.students.forEach(function(st, i){
+      if (!st.tags) st.tags = {};
+      var tr = el("tr");
+      tr.appendChild(el("td", "", String(i + 1)));
+      var td = el("td"); var ni = el("input"); ni.type = "text"; ni.value = st.name;
+      ni.onchange = function(){ if (ni.value.trim()){ st.name = ni.value.trim(); saveState(); } };
+      td.appendChild(ni); tr.appendChild(td);
+      ss.tags.forEach(function(t){
+        var c = el("td", "c");
+        if (t.kind === "level"){
+          var s = el("select");
+          for (var lv=0;lv<=3;lv++) s.innerHTML += '<option value="' + lv + '">' + (lv ? SEAT_LEVELS[lv] : "–") + '</option>';
+          s.value = String(st.tags[t.id] || 0);
+          s.onchange = function(){ var v = parseInt(s.value, 10); if (v) st.tags[t.id] = v; else delete st.tags[t.id]; saveState(); };
+          c.appendChild(s);
+        } else {
+          var cb = el("input"); cb.type = "checkbox"; cb.checked = !!st.tags[t.id];
+          cb.onchange = function(){ if (cb.checked) st.tags[t.id] = true; else delete st.tags[t.id]; saveState(); };
+          c.appendChild(cb);
+        }
+        tr.appendChild(c);
+      });
+      var seat = seatOfStudent(p, st.id);
+      tr.appendChild(el("td", "", seat ? escapeHtml(seatPlaceNameById(seat)) + (st.lock ? " 🔒" : "") : '<span style="color:#8fa3ba">not seated</span>'));
+      var xd = el("td"); var x = el("button", "seatX", "✕"); x.type = "button"; x.title = "Remove " + st.name;
+      x.onclick = function(){ p.students.splice(p.students.indexOf(st), 1); seatSanitize(p); saveState(); render(); };
+      xd.appendChild(x); tr.appendChild(xd);
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    stuWrap.appendChild(tbl);
+  }
+
+  /* ----- 3. Seats ----- */
+  function buildSeatSide(){
+    var p = per();
+    if (!seatList().length){
+      head("No seats yet");
+      hint("Add desks or tables in 1 · Room first.");
+      side.appendChild(btn("Go to Room", "go full", function(){ ed.mode = "room"; render(); }));
+      return;
+    }
+    if (!p.students.length){
+      head("No students yet");
+      hint("Add this period's students in 2 · Students first.");
+      side.appendChild(btn("Go to Students", "go full", function(){ ed.mode = "students"; render(); }));
+      return;
+    }
+    head("Arrange " + ed.period);
+    var shuf = btn("🎲 Shuffle with rules", "go full", function(){
+      if (ed.busy) return;
+      ed.busy = true; shuf.textContent = "Shuffling…";
+      setTimeout(function(){ seatArrange(p, true); ed.busy = false; render(); }, 30);
+    });
+    side.appendChild(shuf);
+    side.appendChild(btn("Random shuffle (ignore rules)", "full", function(){ seatArrange(p, false); render(); }));
+    side.appendChild(btn("Empty all seats", "warn full", function(){
+      showConfirm("Take every student in " + ed.period + " out of their seat (locks too)?", function(ok){
+        if (!ok) return;
+        p.seats = {}; p.students.forEach(function(s){ s.lock = null; }); saveState(); render();
+      });
+    }));
+    var lab = el("label", "seatCheck");
+    var cb = el("input"); cb.type = "checkbox"; cb.checked = ed.showTags;
+    cb.onchange = function(){ ed.showTags = cb.checked; redraw(); };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode("Show tags on seats"));
+    side.appendChild(lab);
+
+    head("How the rules are doing");
+    var rb = el("div", "seatReport");
+    if (!rep || !rep.lines.length) rb.innerHTML = '<div class="ok">✓ Every seating rule is met.</div>';
+    else rb.innerHTML = rep.lines.map(function(l){ return '<div class="no">• ' + escapeHtml(l) + '</div>'; }).join("");
+    side.appendChild(rb);
+    if (rep && rep.lines.length) hint("Seats outlined in red break a rule. Shuffle again, or drag names to fix them by hand.");
+
+    var uns = p.students.filter(function(s){ return !seatOfStudent(p, s.id); });
+    head("Not seated (" + uns.length + ")");
+    var tray = el("div", "seatTray");
+    if (!uns.length) tray.innerHTML = '<div class="seatHint" style="margin:6px;">Everyone has a seat. Drag a name here to take it out of its seat.</div>';
+    uns.forEach(function(st){
+      var c = el("span", "seatChip", escapeHtml(st.name));
+      c.onpointerdown = function(e){ e.preventDefault(); nameDrag(e, st, null); };
+      tray.appendChild(c);
+    });
+    side.appendChild(tray);
+    hint("Drag a name onto another seat to swap them. Click a name to lock 🔒 it in its seat so shuffles leave it there; click again to unlock.");
+  }
+  function nameDrag(e, st, fromSeat){
+    var ghost = null, hover = null;
+    function clearHover(){ if (hover){ hover.classList.remove("dropHover"); hover = null; } }
+    seatTrack(e, function(dx, dy, ev){
+      if (!ghost) ghost = seatGhost(st.name);
+      ghost.style.left = (ev.clientX + 10) + "px"; ghost.style.top = (ev.clientY + 10) + "px";
+      var t = document.elementFromPoint(ev.clientX, ev.clientY);
+      var ts = t && t.closest ? t.closest("[data-seat]") : null;
+      if (ts !== hover){ clearHover(); if (ts){ ts.classList.add("dropHover"); hover = ts; } }
+    }, function(moved, ev){
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      clearHover();
+      var p = per();
+      if (!moved){
+        if (fromSeat){ st.lock = st.lock === fromSeat ? null : fromSeat; saveState(); render(); }
+        return;
+      }
+      var t = document.elementFromPoint(ev.clientX, ev.clientY);
+      var ts = t && t.closest ? t.closest("[data-seat]") : null;
+      if (ts) seatMoveStudent(p, st, ts.getAttribute("data-seat"));
+      else if (t && t.closest && t.closest(".seatTray")) seatMoveStudent(p, st, null);
+      else return;
+      saveState(); render();
+    });
+  }
+  function seatsDown(e){
+    var sl = e.target.closest ? e.target.closest("[data-seat]") : null;
+    if (!sl) return;
+    var sid = sl.getAttribute("data-seat"), p = per(), stId = p.seats[sid];
+    if (!stId) return;
+    var st = seatStudent(p, stId);
+    if (!st) return;
+    e.preventDefault();
+    nameDrag(e, st, sid);
+  }
+  api.room.addEventListener("pointerdown", function(e){
+    if (ed.mode === "room") roomDown(e);
+    else if (ed.mode === "seats") seatsDown(e);
+  });
+
+  render();
 }
 
 /* ============================================================
