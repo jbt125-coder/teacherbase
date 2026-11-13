@@ -6417,7 +6417,8 @@ function seatRandomPlace(per, list){
   var empties = seatShuffle(seatList().filter(function(s){ return !per.seats[s.id]; }));
   for (var i=0;i<list.length && i<empties.length;i++) per.seats[empties[i].id] = list[i].id;
 }
-function seatMoveStudent(per, st, toSeat){
+// pin = the teacher placed this student by hand: lock them there so shuffles keep the choice
+function seatMoveStudent(per, st, toSeat, pin){
   var from = seatOfStudent(per, st.id);
   if (from === toSeat) return;
   var otherId = toSeat ? per.seats[toSeat] : null;
@@ -6428,7 +6429,44 @@ function seatMoveStudent(per, st, toSeat){
     if (from) per.seats[from] = otherId;
     if (other && other.lock) other.lock = from || null;
   }
-  if (st.lock) st.lock = toSeat || null;
+  if (st.lock || pin) st.lock = toSeat || null;
+}
+
+// drag a student's name onto any seat (swaps with whoever is there) or onto a .seatTray.
+// The teacher's drop always wins over the seating rules.
+function seatDragName(e, per, st, fromSeat, done, onClick){
+  var ghost = null, hover = null;
+  function clearHover(){ if (hover){ hover.classList.remove("dropHover"); hover = null; } }
+  seatTrack(e, function(dx, dy, ev){
+    if (!ghost) ghost = seatGhost(st.name);
+    ghost.style.left = (ev.clientX + 10) + "px"; ghost.style.top = (ev.clientY + 10) + "px";
+    var t = document.elementFromPoint(ev.clientX, ev.clientY);
+    var ts = t && t.closest ? t.closest("[data-seat]") : null;
+    if (ts !== hover){ clearHover(); if (ts){ ts.classList.add("dropHover"); hover = ts; } }
+  }, function(moved, ev){
+    if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+    clearHover();
+    if (!moved){ if (onClick) onClick(); return; }
+    var t = document.elementFromPoint(ev.clientX, ev.clientY);
+    var ts = t && t.closest ? t.closest("[data-seat]") : null;
+    if (ts) seatMoveStudent(per, st, ts.getAttribute("data-seat"), true);
+    else if (t && t.closest && t.closest(".seatTray")) seatMoveStudent(per, st, null);
+    else return;
+    saveState();
+    done();
+  });
+}
+// pointerdown on a drawn room: start dragging the name in that seat, if any
+function seatSlotDown(e, per, done, onClick){
+  var sl = e.target.closest ? e.target.closest("[data-seat]") : null;
+  if (!sl) return false;
+  var sid = sl.getAttribute("data-seat"), stId = per.seats[sid];
+  var st = stId ? seatStudent(per, stId) : null;
+  if (!st) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  seatDragName(e, per, st, sid, done, onClick ? function(){ onClick(st, sid); } : null);
+  return true;
 }
 
 /* ---------- drawing ---------- */
@@ -6621,8 +6659,9 @@ function seatReport(per){
   var m = seatModel(), byId = {}, assign = [];
   for (var s=0;s<per.students.length;s++) byId[per.students[s].id] = per.students[s];
   for (var i=0;i<m.n;i++) assign[i] = byId[per.seats[m.seats[i].id]] || null;
-  var groups = {}, bad = {};
+  var groups = {}, bad = {}, pinnedSkips = 0;
   seatScore(m, assign, seatActiveTags(), function(tag, type, list){
+    for (var q=0;q<list.length;q++) if (assign[list[q]].lock){ pinnedSkips++; return; } // the teacher's placement overrides the rule
     var g = groups[tag.id] || (groups[tag.id] = { tag: tag, pos: [], alone: [], pairs: [] });
     for (var k=0;k<list.length;k++) bad[m.seats[list[k]].id] = true;
     if (type === "pair") g.pairs.push(assign[list[0]].name + " & " + assign[list[1]].name);
@@ -6645,7 +6684,7 @@ function seatReport(per){
       lines.push(nm + (rule === "mix" ? ": both 1s side by side: " : ": side by side: ") + shown + ".");
     }
   }
-  return { lines: lines, bad: bad, seated: seated, total: per.students.length, seats: m.n };
+  return { lines: lines, bad: bad, pinnedSkips: pinnedSkips, seated: seated, total: per.students.length, seats: m.n };
 }
 
 // withRules false = plain random shuffle. Locked students stay put either way.
@@ -6904,6 +6943,8 @@ function buildSeatBody(w){
   }
   var o = { period: seatShownPeriod(w), mode: "view", showTags: false };
   var api = seatMount(host, o);
+  // drag names right on the board; the move overrides the rules and locks the student there
+  api.room.addEventListener("pointerdown", function(e){ seatSlotDown(e, seatPer(o.period), function(){ api.draw(); }); });
   function updEmpty(){
     var hasSeats = seatList().length > 0;
     empty.textContent = hasSeats ? "" : "No desks yet. Click Edit to draw your room and add students.";
@@ -7312,6 +7353,7 @@ function seatOpenEditor(period){
     else rb.innerHTML = rep.lines.map(function(l){ return '<div class="no">• ' + escapeHtml(l) + '</div>'; }).join("");
     side.appendChild(rb);
     if (rep && rep.lines.length) hint("Seats outlined in red break a rule. Shuffle again, or drag names to fix them by hand.");
+    if (rep && rep.pinnedSkips) hint("🔒 Locked students stay where you put them, even where that breaks a rule, so they aren't flagged.");
 
     var uns = p.students.filter(function(s){ return !seatOfStudent(p, s.id); });
     head("Not seated (" + uns.length + ")");
@@ -7323,42 +7365,13 @@ function seatOpenEditor(period){
       tray.appendChild(c);
     });
     side.appendChild(tray);
-    hint("Drag a name onto another seat to swap them. Click a name to lock 🔒 it in its seat so shuffles leave it there; click again to unlock.");
+    hint("Drag a name to any seat to move or swap it. Your move always wins over the rules: the student gets locked 🔒 there so shuffles leave them. Click a name to lock or unlock it.");
   }
   function nameDrag(e, st, fromSeat){
-    var ghost = null, hover = null;
-    function clearHover(){ if (hover){ hover.classList.remove("dropHover"); hover = null; } }
-    seatTrack(e, function(dx, dy, ev){
-      if (!ghost) ghost = seatGhost(st.name);
-      ghost.style.left = (ev.clientX + 10) + "px"; ghost.style.top = (ev.clientY + 10) + "px";
-      var t = document.elementFromPoint(ev.clientX, ev.clientY);
-      var ts = t && t.closest ? t.closest("[data-seat]") : null;
-      if (ts !== hover){ clearHover(); if (ts){ ts.classList.add("dropHover"); hover = ts; } }
-    }, function(moved, ev){
-      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
-      clearHover();
-      var p = per();
-      if (!moved){
-        if (fromSeat){ st.lock = st.lock === fromSeat ? null : fromSeat; saveState(); render(); }
-        return;
-      }
-      var t = document.elementFromPoint(ev.clientX, ev.clientY);
-      var ts = t && t.closest ? t.closest("[data-seat]") : null;
-      if (ts) seatMoveStudent(p, st, ts.getAttribute("data-seat"));
-      else if (t && t.closest && t.closest(".seatTray")) seatMoveStudent(p, st, null);
-      else return;
-      saveState(); render();
-    });
+    seatDragName(e, per(), st, fromSeat, render, fromSeat ? function(){ st.lock = st.lock === fromSeat ? null : fromSeat; saveState(); render(); } : null);
   }
   function seatsDown(e){
-    var sl = e.target.closest ? e.target.closest("[data-seat]") : null;
-    if (!sl) return;
-    var sid = sl.getAttribute("data-seat"), p = per(), stId = p.seats[sid];
-    if (!stId) return;
-    var st = seatStudent(p, stId);
-    if (!st) return;
-    e.preventDefault();
-    nameDrag(e, st, sid);
+    seatSlotDown(e, per(), render, function(st, sid){ st.lock = st.lock === sid ? null : sid; saveState(); render(); });
   }
   api.room.addEventListener("pointerdown", function(e){
     if (ed.mode === "room") roomDown(e);
