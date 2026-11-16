@@ -727,6 +727,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
 .passLog td { border-bottom: 1px solid #ece7d9; padding: 4px; white-space: nowrap; }
 /* ––––– Board animals (behind the windows) ––––– */
 #critters { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; z-index: 0; pointer-events: none; }
+#critTop { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .critBox { position: absolute; overflow: visible; }
 .critWeb { position: absolute; left: 0; top: 0; overflow: visible; transition: opacity 5s; }
 .critWeb line { stroke: rgba(235,238,242,.75); stroke-width: .9; stroke-linecap: round; }
@@ -5807,7 +5808,6 @@ function critFreeSpot(w, h){
     .map(function(win){ return { x: win.x - 12, y: win.y - 12, w: win.w + 24, h: win.h + 24 }; });
   // and out of each other's way
   if (crit.spider) rects.push({ x: parseFloat(crit.spider.box.style.left) - 20, y: parseFloat(crit.spider.box.style.top) - 20, w: 280, h: 280 });
-  if (crit.cham) rects.push({ x: crit.cham.m.x - 100, y: crit.cham.m.y - 60, w: 200, h: 120 });
   for (var t=0;t<150;t++){
     var x = vx + 10 + Math.random() * (vw - w - 20), y = vy + 10 + Math.random() * (vh - h - 20);
     if (!rects.some(function(r){ return x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y; })) return { x: x, y: y };
@@ -6026,17 +6026,44 @@ var CHAM_SVG = '<svg viewBox="0 0 160 90" width="100%" height="100%">' +
   '<g class="chLeg near b" style="transform-origin:51px 56px"><path d="M51 56 L45 72 L53 76" class="chS"/></g>' +
   '<circle cx="130" cy="35" r="7" class="chF" stroke-width="1.6" style="stroke:var(--d)"/><circle cx="132" cy="35" r="2.6" fill="#111" class="chPupil"/>' +
   '</svg>';
+// the chameleon climbs onto one of the open windows (over them, unlike the spider) and takes on
+// the color of whatever it's sitting on; it rides along when the window is dragged
+function chamWinEl(w){ return document.getElementById("winel_" + w.id); }
+function chamPickWindow(W, H){
+  var vx = canvas.scrollLeft, vy = canvas.scrollTop, vw = canvas.clientWidth, vh = canvas.clientHeight;
+  var wins = state.windows.filter(function(w){
+    var el = chamWinEl(w);
+    if (!el || w.closed || w.sentAway || isPoppedOut(w) || w.type === "pointer" || w.type === "annotation") return false;
+    // big enough, and the spot under its title bar is on screen
+    return w.w >= W + 40 && w.h >= H + 70 && el.offsetLeft >= vx && el.offsetTop >= vy &&
+      el.offsetLeft + el.offsetWidth <= vx + vw && el.offsetTop + el.offsetHeight <= vy + vh;
+  });
+  if (!wins.length) return null;
+  var w = wins[Math.floor(Math.random() * wins.length)], el = chamWinEl(w);
+  return { win: w, dx: critRand(20, el.offsetWidth - W - 20) + W / 2, dy: critRand(52, el.offsetHeight - H - 12) + H / 2 };
+}
+function chamLayer(){
+  if (!crit.top || !crit.top.isConnected){ crit.top = document.createElement("div"); crit.top.id = "critTop"; canvas.appendChild(crit.top); }
+  return crit.top;
+}
+// above every window
+function chamRaise(){
+  var z = 1;
+  state.windows.forEach(function(w){ if (w.z > z) z = w.z; });
+  chamLayer().style.zIndex = z + 1;
+}
 function chamStart(){
   if (!critOn("chameleon") || crit.cham) return;
-  var W = 170, H = 96, spot = critFreeSpot(W, H);
-  if (!spot){ critLater("chameleon", chamStart, 60000); return; }
+  var W = 170, H = 96, target = chamPickWindow(W, H);
+  if (!target){ critLater("chameleon", chamStart, 60000); return; }
   var el = critSvg(CHAM_SVG, W, H, "critCham");
   el.classList.add("critChamWrap");
   el.style.pointerEvents = "auto";
-  critLayer().appendChild(el);
-  var vx = canvas.scrollLeft, vw = canvas.clientWidth;
-  var tx = spot.x + W / 2, ty = spot.y + H / 2, fromLeft = tx < vx + vw / 2;
-  var me = crit.cham = { el: el, t: null, gone: false };
+  chamRaise();
+  chamLayer().appendChild(el);
+  var wel = chamWinEl(target.win), vx = canvas.scrollLeft, vw = canvas.clientWidth;
+  var tx = wel.offsetLeft + target.dx, ty = wel.offsetTop + target.dy, fromLeft = tx < vx + vw / 2;
+  var me = crit.cham = { el: el, t: null, gone: false, win: target.win, dx: target.dx, dy: target.dy, follow: null };
   var inner = el.firstChild;
   inner.style.transform = fromLeft ? "" : "scaleX(-1)";
   me.m = critMover(el, fromLeft ? vx - W : vx + vw + W, ty, 0);
@@ -6044,15 +6071,40 @@ function chamStart(){
   me.m.go(tx, ty, 26, function(){
     if (me.gone) return;
     inner.classList.remove("walking");
+    me.follow = setInterval(function(){ chamFollow(me); }, 200);
     me.t = setTimeout(function(){ chamBlend(me, true); }, 1500);
   }, true);
   el.addEventListener("click", function(){ chamLeave(); });
 }
-// fades into the board's own color, almost out of sight (on), or back to green
+// stays on its window as it moves; leaves if the window goes away
+function chamFollow(me){
+  if (me.gone) return;
+  var wel = chamWinEl(me.win);
+  if (!wel || me.win.closed || me.win.sentAway || isPoppedOut(me.win)){ chamLeave(); return; }
+  var x = wel.offsetLeft + me.dx, y = wel.offsetTop + me.dy;
+  chamRaise();
+  if (Math.abs(x - me.m.x) > 0.5 || Math.abs(y - me.m.y) > 0.5){
+    me.el.style.transition = "none"; me.m.x = x; me.m.y = y; me.m.place();
+    if (me.el.firstChild.classList.contains("blended")) chamBlend(me, true);
+  }
+}
+// the color showing right under the chameleon (it looks through itself to find it)
+function chamColorUnder(me){
+  var r = me.el.firstChild.getBoundingClientRect(), x = r.left + r.width * 0.5, y = r.top + r.height * 0.45;
+  me.el.style.visibility = "hidden";
+  var under = document.elementFromPoint(x, y);
+  me.el.style.visibility = "";
+  for (var n = under; n && n.nodeType === 1; n = n.parentElement){
+    var bg = getComputedStyle(n).backgroundColor;
+    if (bg && bg !== "transparent" && !/rgba\([^)]*,\s*0\)$/.test(bg)) return bg;
+  }
+  return getComputedStyle(canvas).backgroundColor;
+}
+// fades into the color under it, almost out of sight (on), or back to green
 function chamBlend(me, on){
   var inner = me.el.firstChild;
   if (on){
-    var bg = getComputedStyle(canvas).backgroundColor;
+    var bg = chamColorUnder(me);
     inner.style.setProperty("--c", "color-mix(in srgb, " + bg + " 88%, #5cb85c)");
     inner.style.setProperty("--d", "color-mix(in srgb, " + bg + " 72%, #3a8f3a)");
     inner.classList.add("blended");
@@ -6061,11 +6113,11 @@ function chamBlend(me, on){
     inner.classList.remove("blended");
   }
 }
-// clicked: turns green again and slowly walks off the nearest side; back in about 10 minutes
+// clicked (or its window closed): turns green again and slowly walks off the nearest side; back in about 10 minutes
 function chamLeave(){
   var me = crit.cham;
   if (!me || me.gone) return;
-  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t);
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); clearInterval(me.follow);
   crit.cham = null;
   var el = me.el, inner = el.firstChild;
   chamBlend(me, false);
@@ -6082,9 +6134,8 @@ function chamRemove(){
   var me = crit.cham;
   clearTimeout(crit.wait.chameleon);
   if (!me) return;
-  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); me.el.remove(); crit.cham = null;
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); clearInterval(me.follow); me.el.remove(); crit.cham = null;
 }
-
 // turned on or off in Settings
 function critApply(kind, soon){
   var on = critOn(kind);
