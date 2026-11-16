@@ -588,6 +588,8 @@ width: 100%; max-width: 380px; max-height: 86vh; overflow: auto;
 padding: 18px; color: #e6ebf1;
 }
 .modalCard h3 { margin: 0 0 12px; font-size: 16px; letter-spacing: 0.2px; }
+.animOpt { display: flex !important; gap: 8px; align-items: flex-start; font-size: 12.5px !important; line-height: 1.4; color: #c9d4e0 !important; margin: 6px 0 !important; text-transform: none !important; letter-spacing: 0 !important; font-weight: 500 !important; cursor: pointer; }
+.animOpt input { margin-top: 2px; accent-color: #1f8f7d; }
 .modalSection { margin-bottom: 18px; }
 .modalSection label { display: block; font-size: 11px; color: #8fa3ba; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
 .addWinGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -695,6 +697,74 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+/* ––––– Bathroom pass ––––– */
+.passBody { height: 100%; display: flex; flex-direction: column; font-size: 13px; }
+.passBar { display: flex; gap: 6px; align-items: center; padding: 6px 8px; }
+.passBar select { flex: 1; min-width: 80px; border: 1px solid #c9c2ac; border-radius: 7px; padding: 5px; font-size: 12px; background: #fff; color: #24303f; font-family: inherit; }
+.passBtn { border: none; border-radius: 7px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; background: #e2ddcf; color: #3d3528; }
+.passWarnRow { padding: 0 10px 6px; font-size: 12px; color: #5c5240; }
+.passWarnRow input { width: 46px; padding: 3px; border: 1px solid #c9c2ac; border-radius: 5px; }
+.passScroll { flex: 1; min-height: 0; overflow: auto; padding: 0 8px 8px; }
+.passRow { display: flex; align-items: center; gap: 8px; background: #e6f4ea; border: 2px solid #2f9e44; border-radius: 9px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer; }
+.passRow:hover { filter: brightness(0.97); }
+.passRow.warn { background: #fff3bf; border-color: #f59f00; }
+.passRow.late { background: #ffe3e3; border-color: #e03131; }
+.passName { font-weight: 800; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.passSince { font-size: 11px; color: #6b6152; white-space: nowrap; }
+.passTime { font: 800 18px/1 'SF Mono', Menlo, monospace; min-width: 4ch; text-align: right; }
+.passRow.late .passTime { color: #c92a2a; }
+.passSlot { border: 2px dashed #b9b09b; border-radius: 9px; padding: 6px; margin-bottom: 8px; }
+.passSlot.hover { border-color: #1f8f7d; background: rgba(31,143,125,0.12); }
+.passSlot input { width: 100%; box-sizing: border-box; border: none; background: transparent; font-size: 13px; padding: 4px; outline: none; color: #24303f; }
+.passHint { font-size: 11px; color: #7a6f5c; margin: 2px 2px 6px; }
+.passChips { display: flex; flex-wrap: wrap; gap: 5px; }
+.passChip { background: #e9e3d3; color: #3d3528; border-radius: 12px; padding: 4px 9px; font-weight: 700; font-size: 12px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.passChip.isOut { opacity: .4; cursor: default; }
+.passChip.isAbsent { opacity: .5; text-decoration: line-through; }
+.passGhost { position: fixed; z-index: 1300; pointer-events: none; background: #1f8f7d; color: #fff; padding: 6px 11px; border-radius: 14px; font-weight: 700; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.45); font-family: -apple-system, "Segoe UI", sans-serif; }
+.passLog { width: 100%; border-collapse: collapse; font-size: 12px; }
+.passLog th { text-align: left; font-size: 11px; color: #7a6f5c; border-bottom: 1px solid #dcd6c6; padding: 4px; }
+.passLog td { border-bottom: 1px solid #ece7d9; padding: 4px; white-space: nowrap; }
+/* ––––– Board animals (behind the windows) ––––– */
+#critters { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; z-index: 0; pointer-events: none; }
+.critBox { position: absolute; overflow: visible; }
+.critWeb { position: absolute; left: 0; top: 0; overflow: visible; transition: opacity 5s; }
+.critWeb line { stroke: rgba(235,238,242,.75); stroke-width: .9; stroke-linecap: round; }
+.critWeb line.sticky { stroke: rgba(235,238,242,.6); stroke-width: .7; }
+.critWeb line.drop { stroke: rgba(235,238,242,.7); stroke-width: .9; }
+.critBox.leaving .critWeb { opacity: 0; }
+.critThing { position: absolute; left: 0; top: 0; will-change: transform; }
+.critSpider { cursor: default; }
+.critSpider { filter: drop-shadow(0 0 1.2px rgba(255,255,255,.75)) drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+.critSpider .legs path { stroke: #5a3b21; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; transform-box: view-box; }
+.critSpider.walking .leg, .critThing.walking .critSpider .leg { animation: critLeg .2s ease-in-out infinite alternate; }
+.critThing.walking .leg.l1 { animation-delay: -.1s; }
+.critThing.wrapping .leg { animation: critLeg .08s linear infinite alternate; }
+@keyframes critLeg { from { transform: rotate(-11deg); } to { transform: rotate(11deg); } }
+.critFly .wing { transform-box: fill-box; transform-origin: center; }
+.critFly.flying .wing { animation: critFlap .05s linear infinite alternate; }
+.critFly.stuck { animation: critShake .18s linear infinite alternate; }
+.critFly.fade { transition: opacity 2.5s; opacity: 0; }
+@keyframes critFlap { from { transform: scaleY(1); } to { transform: scaleY(.25); } }
+@keyframes critShake { from { transform: translate(-1px, 0) rotate(-6deg); } to { transform: translate(1px, 1px) rotate(6deg); } }
+.critCocoon { transform: scale(0); transition: transform 3.5s ease-out, opacity 6s; }
+.critCocoon.grow { transform: scale(1) rotate(25deg); }
+.critCocoon.eaten { transform: scale(0) rotate(25deg); opacity: 0; }
+.critCham { --c: #5cb85c; --d: #3a8f3a; transition: opacity 10s; cursor: default; }
+.critCham .chF { fill: var(--c); transition: fill 10s, stroke 10s; }
+.critCham .chS { stroke: var(--c); stroke-width: 6; fill: none; stroke-linecap: round; stroke-linejoin: round; transition: stroke 10s; }
+.critCham .chTail { stroke-width: 7; }
+.critCham .chD { stroke: var(--d); transition: stroke 10s; }
+.critCham .far .chS { stroke: var(--d); }
+.critCham.blended { opacity: .55; }
+.critCham .chLeg { transform-box: view-box; }
+.critCham.walking .chLeg { animation: critChLeg .7s ease-in-out infinite alternate; }
+.critCham.walking .chLeg.b { animation-delay: -.7s; }
+.critCham.walking svg { animation: critBob .7s ease-in-out infinite alternate; }
+.critCham .chPupil { animation: critEye 7s ease-in-out infinite; }
+@keyframes critChLeg { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
+@keyframes critBob { from { transform: translateY(0); } to { transform: translateY(-1.5px); } }
+@keyframes critEye { 0%, 40% { transform: translate(0, 0); } 50%, 70% { transform: translate(-3px, 1.5px); } 80%, 100% { transform: translate(1px, -1.5px); } }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -2718,6 +2788,7 @@ var AVAILABLE_NEW_WINDOWS = [
 { type: "annotation", title: "Transparency Overlay", soon: false },
 { type: "poll", title: "Live Poll", soon: true },
 { type: "seatchart", title: "Seating Chart", soon: false },
+{ type: "bathroom", title: "Bathroom Pass", soon: false },
 { type: "clock", title: "Wall Clock", soon: false },
 { type: "pointer", title: "Pointer Arrow", soon: false },
 { type: "arcade", title: "Arcade", soon: false },
@@ -2758,6 +2829,23 @@ for (var key in THEMES){
 }
 themeSec.appendChild(themeGrid);
 card.appendChild(themeSec);
+
+// board animals
+var animSec = document.createElement("div");
+animSec.className = "modalSection";
+animSec.innerHTML = "<label>Board animals</label>" +
+  '<label class="animOpt"><input type="checkbox" data-an="spider"> 🕷️ Spider: builds a web on empty board space and catches flies. Click it and it climbs away.</label>' +
+  '<label class="animOpt"><input type="checkbox" data-an="chameleon"> 🦎 Chameleon: crawls in and blends into the board. Click it and it walks away, back in about 10 minutes.</label>';
+[].forEach.call(animSec.querySelectorAll("[data-an]"), function(cb){
+  var kind = cb.getAttribute("data-an");
+  cb.checked = critOn(kind);
+  cb.onchange = function(){
+    if (!state.animals) state.animals = {};
+    state.animals[kind] = cb.checked; saveState();
+    critApply(kind, true);
+  };
+});
+card.appendChild(animSec);
 
 // add window section
 var addSec = document.createElement("div");
@@ -3401,7 +3489,7 @@ if (type === "exitslip"){ w.question = ""; w.feed = []; }
 if (type === "bellwork") w.content = "";
 if (type === "timer"){ w.seconds = 600; w.remaining = 600; w.running = false; }
 if (type === "signin") w.roster = [];
-if (type === "seatchart") w.period = "auto";
+if (type === "seatchart" || type === "bathroom") w.period = "auto";
 if (type === "answers") w.feed = [];
 if (type === "arcade"){ w.highScores = {}; w.hoopsScoring2 = true; }
 if (type === "pointer"){ w.text = "Do This!!!"; w.shape = "arrow"; w.dir = -45; w.size = 1; w.animate = true; }
@@ -3417,6 +3505,7 @@ buildBody = function(w){
 if (w.type === "arcade") return buildArcadeBody(w);
 if (w.type === "cfu") return buildCfuBody(w);
 if (w.type === "seatchart") return buildSeatBody(w);
+if (w.type === "bathroom") return buildPassBody(w);
 if (w.type === "note"){
 var wrap = document.createElement("div");
 wrap.style.height = "100%";
@@ -5542,6 +5631,469 @@ function openNotebookGames(){
 }
 
 /* ============================================================
+BATHROOM PASS — who's out, for how long, and a log by date and period
+============================================================ */
+function passState(){
+  if (!state.passes) state.passes = { out: [], log: [], warn: [5, 10] };
+  return state.passes;
+}
+// student ids out right now in this period (the seating chart shows 🚻 and the spinner skips them)
+function passOutIds(period){
+  var ids = {}, out = state.passes ? state.passes.out : [];
+  for (var i=0;i<out.length;i++) if (out[i].period === period && out[i].sid) ids[out[i].sid] = 1;
+  return ids;
+}
+function passAwayChanged(){ document.dispatchEvent(new Event("seatAwayChanged")); }
+function passSend(period, name, sid){
+  var ps = passState();
+  name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 40);
+  if (!name) return false;
+  for (var i=0;i<ps.out.length;i++) if (ps.out[i].period === period && ps.out[i].name.toLowerCase() === name.toLowerCase()) return false;
+  ps.out.push({ id: seatUid("po_"), name: name, sid: sid || null, period: period, at: Date.now() });
+  saveState(); passAwayChanged();
+  return true;
+}
+function passBack(id){
+  var ps = passState();
+  for (var i=0;i<ps.out.length;i++){
+    var o = ps.out[i];
+    if (o.id !== id) continue;
+    var d = new Date(o.at);
+    ps.log.push({ d: d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()), p: o.period, n: o.name, o: o.at, b: Date.now() });
+    ps.out.splice(i, 1);
+    saveState(); passAwayChanged();
+    return;
+  }
+}
+function passFmt(ms){ var s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ":" + pad2(s % 60); }
+function passClock(t){ return new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+
+function buildPassBody(w){
+  var wrap = document.createElement("div");
+  wrap.className = "passBody";
+  var view = "main";   // or "log"
+  function period(){ return seatShownPeriod(w); }
+  function render(){
+    var ps = passState(), p = period();
+    if (view === "log") return renderLog();
+    var labels = seatPeriodLabels(), now = seatNowPeriod();
+    if (w.period && w.period !== "auto" && labels.indexOf(w.period) === -1) labels = labels.concat([w.period]);
+    var out = ps.out.filter(function(o){ return o.period === p; }).sort(function(a, b){ return a.at - b.at; });   // out the longest on top
+    var outNames = {};
+    out.forEach(function(o){ outNames[o.name.toLowerCase()] = 1; });
+    var roster = seatPer(p).students.slice().sort(function(a, b){ return a.name.localeCompare(b.name); });
+    var absent = seatAbsentToday(p);
+    wrap.innerHTML =
+      '<div class="passBar"><select title="Class period"><option value="auto">Current period' + (now ? " (" + escapeHtml(now) + ")" : "") + '</option>' +
+        labels.map(function(l){ return '<option value="' + escapeHtml(l) + '">' + escapeHtml(l) + '</option>'; }).join("") + '</select>' +
+        '<button class="passBtn" data-a="log">📋 Log</button><button class="passBtn" data-a="warn" title="When the time turns yellow and red">⏱</button></div>' +
+      '<div class="passWarnRow" hidden>Yellow after <input type="number" min="1" max="60" data-w="0" value="' + ps.warn[0] + '"> min, red after <input type="number" min="1" max="90" data-w="1" value="' + ps.warn[1] + '"> min</div>' +
+      '<div class="passScroll">' +
+        '<div class="passOut">' + (out.length ? out.map(function(o){
+          return '<div class="passRow" data-id="' + o.id + '" data-at="' + o.at + '" title="Click when they\'re back"><span class="passName">🚻 ' + escapeHtml(o.name) + '</span>' +
+            '<span class="passSince">out at ' + passClock(o.at) + '</span><span class="passTime"></span></div>';
+        }).join("") : '') + '</div>' +
+        '<div class="passSlot"><input placeholder="Drag a name here, or type one and press Enter" maxlength="40"></div>' +
+        (roster.length ? '<div class="passHint">' + escapeHtml(p) + ': drag or click a name to send them out. Click a name above when they\'re back.</div>' +
+          '<div class="passChips">' + roster.map(function(st){
+            var isOut = outNames[st.name.toLowerCase()];
+            return '<span class="passChip' + (isOut ? " isOut" : "") + (absent[st.id] ? " isAbsent" : "") + '" data-sid="' + st.id + '"' + (absent[st.id] ? ' title="Marked absent today"' : '') + '>' + escapeHtml(st.name) + '</span>';
+          }).join("") + '</div>'
+          : '<div class="passHint">Add students to ' + escapeHtml(p) + ' in the Seating Chart to drag names from a list. You can still type names.</div>') +
+      '</div>';
+    var sel = wrap.querySelector("select");
+    sel.value = w.period || "auto";
+    sel.onchange = function(){ w.period = sel.value; saveState(); render(); };
+    wrap.querySelector('[data-a="log"]').onclick = function(){ view = "log"; render(); };
+    wrap.querySelector('[data-a="warn"]').onclick = function(){ var r = wrap.querySelector(".passWarnRow"); r.hidden = !r.hidden; };
+    [].forEach.call(wrap.querySelectorAll("[data-w]"), function(inp){
+      inp.onchange = function(){ var v = Math.max(1, parseInt(inp.value, 10) || 1); ps.warn[+inp.getAttribute("data-w")] = v; saveState(); tick(); };
+    });
+    [].forEach.call(wrap.querySelectorAll(".passRow"), function(r){ r.onclick = function(){ passBack(r.getAttribute("data-id")); render(); }; });
+    var inp = wrap.querySelector(".passSlot input");
+    inp.onkeydown = function(e){
+      if (e.key !== "Enter") return;
+      var name = inp.value.trim(), match = null;
+      roster.forEach(function(st){ if (st.name.toLowerCase() === name.toLowerCase()) match = st; });
+      if (passSend(p, match ? match.name : name, match ? match.id : null)) render();
+    };
+    [].forEach.call(wrap.querySelectorAll(".passChip"), function(ch){
+      ch.onpointerdown = function(e){ chipDrag(e, ch); };
+    });
+    tick();
+  }
+  function rosterStudent(sid){ return seatStudent(seatPer(period()), sid); }
+  // drag a name chip into the slot (or the list); a click without dragging sends them out too
+  function chipDrag(e, ch){
+    if (ch.classList.contains("isOut")) return;
+    e.preventDefault();
+    var doc = ch.ownerDocument, st = rosterStudent(ch.getAttribute("data-sid"));
+    if (!st) return;
+    var sx = e.clientX, sy = e.clientY, ghost = null, slot = wrap.querySelector(".passSlot");
+    function over(ev){ var r = slot.getBoundingClientRect(), r2 = wrap.querySelector(".passOut").getBoundingClientRect();
+      return (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top - 6 && ev.clientY <= r.bottom + 6) ||
+        (ev.clientX >= r2.left && ev.clientX <= r2.right && ev.clientY >= r2.top && ev.clientY <= r2.bottom && r2.height > 0); }
+    function move(ev){
+      if (!ghost && Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 6){
+        ghost = doc.createElement("div"); ghost.className = "passGhost"; ghost.textContent = "🚻 " + st.name; doc.body.appendChild(ghost);
+      }
+      if (ghost){ ghost.style.left = ev.clientX + 10 + "px"; ghost.style.top = ev.clientY + 10 + "px"; slot.classList.toggle("hover", over(ev)); }
+    }
+    function up(ev){
+      doc.removeEventListener("pointermove", move); doc.removeEventListener("pointerup", up);
+      slot.classList.remove("hover");
+      if (ghost){ ghost.remove(); if (!over(ev)) return; }
+      if (passSend(period(), st.name, st.id)) render();
+    }
+    doc.addEventListener("pointermove", move); doc.addEventListener("pointerup", up);
+  }
+  function tick(){
+    var ps = passState(), now = Date.now();
+    [].forEach.call(wrap.querySelectorAll(".passRow"), function(r){
+      var ms = now - (+r.getAttribute("data-at")), m = ms / 60000;
+      r.querySelector(".passTime").textContent = passFmt(ms);
+      r.classList.toggle("warn", m >= ps.warn[0] && m < ps.warn[1]);
+      r.classList.toggle("late", m >= ps.warn[1]);
+    });
+  }
+  function renderLog(){
+    var ps = passState(), days = [];
+    ps.log.forEach(function(e){ if (days.indexOf(e.d) === -1) days.push(e.d); });
+    days.sort().reverse();
+    if (w.logDay && w.logDay !== "all" && days.indexOf(w.logDay) === -1) w.logDay = "all";
+    var day = w.logDay || "all";
+    var rows = ps.log.filter(function(e){ return day === "all" || e.d === day; }).slice().reverse();
+    wrap.innerHTML =
+      '<div class="passBar"><button class="passBtn" data-a="back">← Back</button><select title="Which day"><option value="all">All days</option>' +
+        days.map(function(d){ return '<option value="' + d + '">' + fmtDateLabel(d) + '</option>'; }).join("") + '</select></div>' +
+      '<div class="passScroll">' + (rows.length ? '<table class="passLog"><tr><th>Date</th><th>Period</th><th>Name</th><th>Out</th><th>Back</th><th>Min</th></tr>' +
+        rows.map(function(e){
+          return '<tr><td>' + fmtDateLabel(e.d) + '</td><td>' + escapeHtml(e.p) + '</td><td>' + escapeHtml(e.n) + '</td><td>' + passClock(e.o) + '</td><td>' + passClock(e.b) + '</td><td>' + Math.max(1, Math.round((e.b - e.o) / 60000)) + '</td></tr>';
+        }).join("") + '</table>' : '<div class="passHint">No passes logged yet.</div>') + '</div>';
+    var sel = wrap.querySelector("select");
+    sel.value = day;
+    sel.onchange = function(){ w.logDay = sel.value; saveState(); renderLog(); };
+    wrap.querySelector('[data-a="back"]').onclick = function(){ view = "main"; render(); };
+  }
+  render();
+  var lastPeriod = period();
+  var iv = setInterval(function(){
+    if (!wrap.isConnected){ clearInterval(iv); return; }
+    if (period() !== lastPeriod){ lastPeriod = period(); if (view === "main") render(); }
+    tick();
+  }, 1000);
+  return wrap;
+}
+
+/* ============================================================
+BOARD ANIMALS — a spider that builds a web in empty board space and
+catches flies, and a chameleon that blends into the board. They live
+behind the windows, on the board itself. Turned on in Settings.
+============================================================ */
+var CRIT_FAST = /[?&]critterfast\b/.test(location.search) ? 30 : 1;   // ?critterfast: every wait 30x shorter, for trying them out
+function critWait(ms){ return ms / CRIT_FAST; }
+function critRand(a, b){ return a + Math.random() * (b - a); }
+var crit = { layer: null, spider: null, cham: null, wait: {} };
+function critOn(kind){ return !!(state.animals && state.animals[kind]); }
+function critLayer(){
+  if (!crit.layer || !crit.layer.isConnected){ crit.layer = document.createElement("div"); crit.layer.id = "critters"; canvas.appendChild(crit.layer); }
+  return crit.layer;
+}
+// a w×h patch of board in view that no window covers
+function critFreeSpot(w, h){
+  var vx = canvas.scrollLeft, vy = canvas.scrollTop, vw = canvas.clientWidth, vh = canvas.clientHeight;
+  if (vw < w + 20 || vh < h + 20) return null;
+  var rects = state.windows.filter(function(win){ return !win.closed && !win.sentAway && !isPoppedOut(win) && win.type !== "pointer"; })
+    .map(function(win){ return { x: win.x - 12, y: win.y - 12, w: win.w + 24, h: win.h + 24 }; });
+  // and out of each other's way
+  if (crit.spider) rects.push({ x: parseFloat(crit.spider.box.style.left) - 20, y: parseFloat(crit.spider.box.style.top) - 20, w: 280, h: 280 });
+  if (crit.cham) rects.push({ x: crit.cham.m.x - 100, y: crit.cham.m.y - 60, w: 200, h: 120 });
+  for (var t=0;t<150;t++){
+    var x = vx + 10 + Math.random() * (vw - w - 20), y = vy + 10 + Math.random() * (vh - h - 20);
+    if (!rects.some(function(r){ return x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y; })) return { x: x, y: y };
+  }
+  return null;
+}
+function critLater(kind, fn, ms){ clearTimeout(crit.wait[kind]); crit.wait[kind] = setTimeout(fn, critWait(ms)); }
+// a thing that walks: moves its centre to (x, y) at speed px/s, facing where it goes; calls done when there
+function critMover(el, x, y, ang){
+  var m = { el: el, x: x, y: y, ang: ang || 0, t: null };
+  m.place = function(){ el.style.transform = "translate(" + m.x + "px," + m.y + "px) rotate(" + m.ang + "deg)"; };
+  m.go = function(x2, y2, speed, done, keepAngle){
+    var dx = x2 - m.x, dy = y2 - m.y, dist = Math.sqrt(dx*dx + dy*dy), ms = dist / speed * 1000;
+    if (!keepAngle && dist > 0.5){
+      var a = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      while (a - m.ang > 180) a -= 360;
+      while (a - m.ang < -180) a += 360;
+      m.ang = a;
+    }
+    el.style.transition = "transform " + Math.max(0, ms) + "ms linear";
+    m.x = x2; m.y = y2; m.place();
+    clearTimeout(m.t);
+    if (done) m.t = setTimeout(done, ms + 30);
+    return ms;
+  };
+  m.place();
+  return m;
+}
+function critSvg(markup, w, h, cls){
+  var d = document.createElement("div");
+  d.className = cls;
+  d.style.cssText = "position:absolute;left:" + (-w/2) + "px;top:" + (-h/2) + "px;width:" + w + "px;height:" + h + "px;";
+  d.innerHTML = markup;
+  var outer = document.createElement("div");
+  outer.className = "critThing";
+  outer.appendChild(d);
+  return outer;
+}
+
+/* ---------- the spider ---------- */
+var SPIDER_SVG = (function(){
+  var legs = "", L = [[[3,-5],[9,-12],[12,-17]], [[3.5,-3],[11,-6],[15,-9]], [[3.5,-1],[11,2],[15,6]], [[3,1],[9,8],[11,14]]];
+  [-1, 1].forEach(function(s){ L.forEach(function(p, k){
+    legs += '<path class="leg l' + ((k + (s > 0 ? 1 : 0)) % 2) + '" style="transform-origin:' + (20 + s*p[0][0]) + 'px ' + (20 + p[0][1]) + 'px" d="M' +
+      p.map(function(q){ return (20 + s*q[0]) + " " + (20 + q[1]); }).join(" L") + '"/>';
+  }); });
+  return '<svg viewBox="0 0 40 40" width="100%" height="100%"><g class="legs">' + legs + '</g>' +
+    '<ellipse cx="20" cy="25.5" rx="6.3" ry="8" fill="#6e4a2a"/><path d="M17 22 Q20 20.5 23 22 M16.5 25.5 Q20 24 23.5 25.5 M17 29 Q20 27.5 23 29" stroke="#d9b07a" stroke-width="1.1" fill="none"/>' +
+    '<ellipse cx="20" cy="15" rx="4.2" ry="4.4" fill="#57391f"/><circle cx="18.6" cy="12.3" r=".8" fill="#f2e6cf"/><circle cx="21.4" cy="12.3" r=".8" fill="#f2e6cf"/></svg>';
+})();
+var FLY_SVG = '<svg viewBox="0 0 30 30" width="100%" height="100%"><ellipse class="wing" cx="9.5" cy="14" rx="5.5" ry="2.6" transform="rotate(-25 9.5 14)" fill="rgba(210,235,255,.7)" stroke="rgba(60,60,60,.5)" stroke-width=".6"/>' +
+  '<ellipse class="wing" cx="20.5" cy="14" rx="5.5" ry="2.6" transform="rotate(25 20.5 14)" fill="rgba(210,235,255,.7)" stroke="rgba(60,60,60,.5)" stroke-width=".6"/>' +
+  '<ellipse cx="15" cy="17.5" rx="3.4" ry="5" fill="#26262b"/><circle cx="15" cy="11.5" r="2.7" fill="#34343a"/><circle cx="13.7" cy="10.8" r="1.1" fill="#b3261e"/><circle cx="16.3" cy="10.8" r="1.1" fill="#b3261e"/></svg>';
+var COCOON_SVG = '<svg viewBox="0 0 20 20" width="100%" height="100%"><ellipse cx="10" cy="10" rx="5.5" ry="7.5" fill="#f4f1ea" stroke="#d6d0c2" stroke-width=".6"/>' +
+  '<path d="M5 6 L15 9 M4.6 9.5 L15.4 12.5 M5 13 L15 15.5 M6 4 L14 6" stroke="#cfc8b6" stroke-width=".7"/></svg>';
+
+function spiderStart(){
+  if (!critOn("spider") || crit.spider) return;
+  var S = 240, spot = critFreeSpot(S, S);
+  if (!spot){ critLater("spider", spiderStart, 60000); return; }
+  var box = document.createElement("div");
+  box.className = "critBox";
+  box.style.cssText = "left:" + spot.x + "px;top:" + spot.y + "px;width:" + S + "px;height:" + S + "px;";
+  box.innerHTML = '<svg class="critWeb" width="' + S + '" height="' + S + '" viewBox="0 0 ' + S + ' ' + S + '"></svg>';
+  critLayer().appendChild(box);
+  var web = box.querySelector(".critWeb");
+  var spEl = critSvg(SPIDER_SVG, 54, 54, "critSpider");
+  box.appendChild(spEl);
+  spEl.style.pointerEvents = "auto";
+  var c = S / 2, sp = critMover(spEl, c, -40, 180);
+  var me = crit.spider = { box: box, sp: sp, el: spEl, t: null, gone: false, web: web, spiral: [] };
+  spEl.title = "";
+  spEl.addEventListener("click", function(){ spiderLeave(); });
+
+  function line(x1, y1, x2, y2, ms, cls){
+    var l = document.createElementNS("http://www.w3.org/2000/svg", "line"), len = Math.sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
+    l.setAttribute("x1", x1); l.setAttribute("y1", y1); l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+    if (cls) l.setAttribute("class", cls);
+    l.style.strokeDasharray = len; l.style.strokeDashoffset = len;
+    web.appendChild(l);
+    l.getBoundingClientRect();
+    l.style.transition = "stroke-dashoffset " + ms + "ms linear";
+    l.style.strokeDashoffset = 0;
+    return l;
+  }
+  // the web: a drop line, spokes out from the middle, a frame around them, then the sticky spiral from the outside in
+  var N = 9 + Math.floor(Math.random() * 3), anchors = [];
+  for (var i=0;i<N;i++){
+    var a = (i + critRand(-0.18, 0.18)) / N * Math.PI * 2, R = critRand(96, 112);
+    anchors.push({ x: c + Math.cos(a) * R, y: c + Math.sin(a) * R, a: a, R: R });
+  }
+  var steps = [];   // each: [x, y, speed, drawThread]
+  steps.push([c, c, 60, true]);
+  anchors.forEach(function(p){ steps.push([p.x, p.y, 70, true]); steps.push([c, c, 110, false]); });
+  steps.push([anchors[0].x, anchors[0].y, 110, false]);
+  for (var f=1;f<=N;f++){ var q = anchors[f % N]; steps.push([q.x, q.y, 80, true]); }
+  var rOut = 0.86, rIn = 0.14, turns = 8, total = turns * N;
+  for (var j=0;j<=total;j++){
+    var p2 = anchors[j % N], frac = rOut - (rOut - rIn) * j / total;
+    var pt = { x: c + (p2.x - c) * frac, y: c + (p2.y - c) * frac };
+    me.spiral.push(pt);
+    steps.push([pt.x, pt.y, 75, j > 0]);
+  }
+  steps.push([c, c, 60, false]);
+  var k = 0;
+  spEl.classList.add("walking");
+  (function next(){
+    if (me.gone) return;
+    if (k >= steps.length){ spEl.classList.remove("walking"); spiderWaitFly(); return; }
+    var st = steps[k++], x0 = sp.x, y0 = sp.y;
+    var ms = sp.go(st[0], st[1], st[2], next);
+    if (st[3]) line(x0, y0, st[0], st[1], ms, k > 2 * N + 2 + N ? "sticky" : "");
+  })();
+}
+function spiderWaitFly(){
+  var me = crit.spider;
+  if (!me || me.gone) return;
+  me.t = setTimeout(function(){ spiderFly(); }, critWait(critRand(3, 8) * 60000));
+}
+function spiderFly(){
+  var me = crit.spider;
+  if (!me || me.gone) return;
+  var c = 120, land = me.spiral[Math.floor(critRand(me.spiral.length * 0.15, me.spiral.length * 0.7))];
+  var flyEl = critSvg(FLY_SVG, 24, 24, "critFly flying");
+  me.box.appendChild(flyEl);
+  var a0 = Math.random() * Math.PI * 2, fly = critMover(flyEl, c + Math.cos(a0) * 420, c + Math.sin(a0) * 420, 0);
+  me.fly = flyEl;
+  // a wobbly flight in, then stuck in the web
+  var pts = [];
+  for (var i=3;i>=1;i--){ var r = i * 90; pts.push([land.x + Math.cos(a0) * r + critRand(-60, 60), land.y + Math.sin(a0) * r + critRand(-60, 60)]); }
+  pts.push([land.x, land.y]);
+  var i2 = 0;
+  (function hop(){
+    if (me.gone) return;
+    if (i2 >= pts.length){
+      flyEl.firstChild.classList.remove("flying"); flyEl.firstChild.classList.add("stuck");
+      me.t = setTimeout(function(){ spiderCatch(fly); }, critRand(2500, 5000));
+      return;
+    }
+    var p = pts[i2++];
+    fly.go(p[0], p[1], 170, hop);
+  })();
+}
+function spiderCatch(fly){
+  var me = crit.spider;
+  if (!me || me.gone) return;
+  var sp = me.sp;
+  me.el.classList.add("walking");
+  sp.go(fly.x, fly.y - 6, 85, function(){
+    if (me.gone) return;
+    // wrap it up
+    me.el.classList.remove("walking"); me.el.classList.add("wrapping");
+    var coc = critSvg(COCOON_SVG, 22, 22, "critCocoon");
+    me.box.appendChild(coc);
+    var cm = critMover(coc, fly.x, fly.y, 0);
+    me.cocoon = coc;
+    coc.firstChild.classList.add("grow");
+    fly.el.firstChild.classList.add("fade");
+    me.t = setTimeout(function(){
+      if (me.gone) return;
+      fly.el.remove(); me.fly = null;
+      me.el.classList.remove("wrapping"); me.el.classList.add("walking");
+      // carry it to the middle and eat it
+      sp.go(120, 114, 50, function(){
+        if (me.gone) return;
+        me.el.classList.remove("walking"); me.el.classList.add("wrapping");
+        coc.firstChild.classList.add("eaten");
+        me.t = setTimeout(function(){
+          if (me.gone) return;
+          coc.remove(); me.cocoon = null;
+          me.el.classList.remove("wrapping");
+          spiderWaitFly();
+        }, 6500);
+      });
+      cm.go(120, 122, 50);
+    }, 4000);
+  });
+}
+// clicked: climbs away up a thread, the web fades, and it comes back later somewhere else
+function spiderLeave(){
+  var me = crit.spider;
+  if (!me || me.gone) return;
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.sp.t);
+  var top = canvas.scrollTop - parseFloat(me.box.style.top) - 60;
+  var l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  l.setAttribute("x1", me.sp.x); l.setAttribute("y1", me.sp.y); l.setAttribute("x2", me.sp.x); l.setAttribute("y2", top);
+  l.setAttribute("class", "drop");
+  me.web.appendChild(l);
+  me.web.style.overflow = "visible";
+  me.el.classList.add("walking");
+  var ms = me.sp.go(me.sp.x, top, 90, null);
+  me.box.classList.add("leaving");
+  setTimeout(function(){ me.box.remove(); }, Math.max(ms, 5000) + 200);
+  crit.spider = null;
+  critLater("spider", spiderStart, 10 * 60000);
+}
+function spiderRemove(){
+  var me = crit.spider;
+  clearTimeout(crit.wait.spider);
+  if (!me) return;
+  me.gone = true; clearTimeout(me.t); me.box.remove(); crit.spider = null;
+}
+
+/* ---------- the chameleon ---------- */
+var CHAM_SVG = '<svg viewBox="0 0 160 90" width="100%" height="100%">' +
+  '<g class="chLeg far" style="transform-origin:94px 55px"><path d="M94 54 L90 70 L97 75" class="chS"/></g>' +
+  '<g class="chLeg far b" style="transform-origin:58px 56px"><path d="M58 56 L63 71 L70 74" class="chS"/></g>' +
+  '<path d="M40 52 C22 54 9 64 12 74 C14 85 31 85 31 74 C31 66 21 66 21 73 C21 78 27 78 27 74" class="chS chTail"/>' +
+  '<path d="M38 50 C40 30 70 21 98 27 C112 30 119 38 121 46 C110 58 70 62 50 60 C42 59 37 56 38 50 Z" class="chF"/>' +
+  '<path d="M46 40 L50 33 L55 37 L60 29 L65 34 L71 26 L76 31 L82 24 L87 29 L94 23 L99 28" class="chD" fill="none" stroke-width="2.4" stroke-linejoin="round"/>' +
+  '<path d="M60 44 C66 40 72 50 80 45 M86 41 C92 38 98 48 104 43" class="chD" fill="none" stroke-width="3" opacity=".55"/>' +
+  '<path d="M111 30 C119 19 137 21 147 34 C151 40 149 46 141 48 L120 50 C115 46 113 38 111 30 Z" class="chF"/>' +
+  '<path d="M114 29 C118 18 128 14 134 22" class="chD" fill="none" stroke-width="2"/>' +
+  '<path d="M128 44 Q138 46 147 41" class="chD" fill="none" stroke-width="1.5"/>' +
+  '<g class="chLeg near" style="transform-origin:101px 55px"><path d="M101 54 L106 70 L114 74" class="chS"/></g>' +
+  '<g class="chLeg near b" style="transform-origin:51px 56px"><path d="M51 56 L45 72 L53 76" class="chS"/></g>' +
+  '<circle cx="130" cy="35" r="7" class="chF" stroke-width="1.6" style="stroke:var(--d)"/><circle cx="132" cy="35" r="2.6" fill="#111" class="chPupil"/>' +
+  '</svg>';
+function chamStart(){
+  if (!critOn("chameleon") || crit.cham) return;
+  var W = 170, H = 96, spot = critFreeSpot(W, H);
+  if (!spot){ critLater("chameleon", chamStart, 60000); return; }
+  var el = critSvg(CHAM_SVG, W, H, "critCham");
+  el.classList.add("critChamWrap");
+  el.style.pointerEvents = "auto";
+  critLayer().appendChild(el);
+  var vx = canvas.scrollLeft, vw = canvas.clientWidth;
+  var tx = spot.x + W / 2, ty = spot.y + H / 2, fromLeft = tx < vx + vw / 2;
+  var me = crit.cham = { el: el, t: null, gone: false };
+  var inner = el.firstChild;
+  inner.style.transform = fromLeft ? "" : "scaleX(-1)";
+  me.m = critMover(el, fromLeft ? vx - W : vx + vw + W, ty, 0);
+  inner.classList.add("walking");
+  me.m.go(tx, ty, 26, function(){
+    if (me.gone) return;
+    inner.classList.remove("walking");
+    me.t = setTimeout(function(){ chamBlend(me, true); }, 1500);
+  }, true);
+  el.addEventListener("click", function(){ chamLeave(); });
+}
+// fades into the board's own color, almost out of sight (on), or back to green
+function chamBlend(me, on){
+  var inner = me.el.firstChild;
+  if (on){
+    var bg = getComputedStyle(canvas).backgroundColor;
+    inner.style.setProperty("--c", "color-mix(in srgb, " + bg + " 88%, #5cb85c)");
+    inner.style.setProperty("--d", "color-mix(in srgb, " + bg + " 72%, #3a8f3a)");
+    inner.classList.add("blended");
+  } else {
+    inner.style.removeProperty("--c"); inner.style.removeProperty("--d");
+    inner.classList.remove("blended");
+  }
+}
+// clicked: turns green again and slowly walks off the nearest side; back in about 10 minutes
+function chamLeave(){
+  var me = crit.cham;
+  if (!me || me.gone) return;
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t);
+  crit.cham = null;
+  var el = me.el, inner = el.firstChild;
+  chamBlend(me, false);
+  var vx = canvas.scrollLeft, vw = canvas.clientWidth, goLeft = me.m.x < vx + vw / 2;
+  setTimeout(function(){
+    inner.style.transform = goLeft ? "scaleX(-1)" : "";
+    inner.classList.add("walking");
+    var ms = me.m.go(goLeft ? vx - 200 : vx + vw + 200, me.m.y, 22, null, true);
+    setTimeout(function(){ el.remove(); }, ms + 100);
+  }, 1800);
+  critLater("chameleon", chamStart, 10 * 60000);
+}
+function chamRemove(){
+  var me = crit.cham;
+  clearTimeout(crit.wait.chameleon);
+  if (!me) return;
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); me.el.remove(); crit.cham = null;
+}
+
+// turned on or off in Settings
+function critApply(kind, soon){
+  var on = critOn(kind);
+  if (kind === "spider"){ if (!on) spiderRemove(); else if (!crit.spider) critLater("spider", spiderStart, soon ? 15000 : critRand(30000, 60000)); }
+  if (kind === "chameleon"){ if (!on) chamRemove(); else if (!crit.cham) critLater("chameleon", chamStart, soon ? 20000 : critRand(40000, 80000)); }
+}
+function critInit(){ critApply("spider"); critApply("chameleon"); }
+
+/* ============================================================
 CHECKS FOR UNDERSTANDING — multiple-choice pop-ups timed to the bell schedule
 ============================================================ */
 var CFU_EXAMPLE = "Question: What is 2 + 2?\nA: 1, B: 2, C: 3, D: 4, Answer: D\n\nQuestion: Which planet is closest to the Sun?\nA: Venus, B: Mercury, C: Earth, D: Mars, Answer: B";
@@ -6227,7 +6779,10 @@ var SEAT_CSS =
 ".seatSlot.spinHi{background:#ffe066 !important;box-shadow:0 0 0 4px #fab005,0 0 26px 8px rgba(250,176,5,.85) !important;z-index:8;}" +
 ".seatSlot.picked{background:#ffe066 !important;z-index:8;animation:seatPickGlow .9s ease-in-out infinite alternate;}" +
 "@keyframes seatPickGlow{from{box-shadow:0 0 0 5px #f08c00,0 0 30px 10px rgba(255,212,59,.8);}to{box-shadow:0 0 0 8px #ff6b00,0 0 60px 22px rgba(255,212,59,1);}}" +
-".seatSlot.answeredRound{opacity:.55;}";
+".seatSlot.answeredRound{opacity:.55;}" +
+".seatSlot.away-absent{opacity:.35;filter:grayscale(1);}" +
+".seatSlot.away-out{background:rgba(255,236,153,.65) !important;}" +
+".seatAwayMark{position:absolute;left:3px;bottom:1px;font-size:15px;line-height:1;}";
 
 var SEAT_ED_CSS =
 ".seatEd{position:fixed;inset:0;z-index:1100;background:#141b26;display:flex;flex-direction:column;color:#e6ebf1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}" +
@@ -6329,6 +6884,9 @@ var SEAT_ED_CSS =
 ".seatAskB.correct{background:#2b8a3e;}" +
 ".seatAskB.answered{background:#1971c2;}" +
 ".seatAskB.skipped{background:#495057;}" +
+".seatAskB.undo{background:#2b3648;color:#e6ebf1;font-size:15px;}" +
+".seatBtn.seatAskAbsent.on{background:#c92a2a;border-color:#c92a2a;color:#fff;}" +
+".seatAsk.absentMode .seatSlot.filled,.seatAsk .seatSlot.filled{cursor:pointer;}" +
 "@media (max-width:760px){.seatAskSide{position:absolute;right:0;top:0;bottom:0;width:86vw;z-index:30;}}";
 
 function seatCss(doc){
@@ -6537,6 +7095,7 @@ function seatTagChips(st){
 function seatDraw(room, o){
   var ss = seatState(), doc = room.ownerDocument;
   var per = o.period ? seatPer(o.period) : null, byId = {}, money = o.money && o.period ? seatMoneyToday(o.period) : {};
+  var away = o.money && o.period ? seatAway(o.period) : {};
   if (per) for (var b=0;b<per.students.length;b++) byId[per.students[b].id] = per.students[b];
   room.innerHTML = "";
   room.style.width = SEAT_W + "px";
@@ -6559,7 +7118,7 @@ function seatDraw(room, o){
       var sl = slots[s], sid = seatSlotId(it, sl.k);
       var st = per && per.seats[sid] ? byId[per.seats[sid]] : null;
       var se = doc.createElement("div");
-      se.className = "seatSlot" + (st ? " filled" : " empty") + (o.bad && o.bad[sid] ? " bad" : "");
+      se.className = "seatSlot" + (st ? " filled" : " empty") + (o.bad && o.bad[sid] ? " bad" : "") + (st && away[st.id] ? " away-" + away[st.id] : "");
       se.setAttribute("data-seat", sid);
       var fs = Math.max(8, Math.min(13, sl.w / 5.2));
       var html = "", shown = "";
@@ -6577,6 +7136,7 @@ function seatDraw(room, o){
         if (o.showTags) html += seatTagChips(st);
         if (o.mode === "seats" && st.lock === sid) html += '<span class="seatLock">🔒</span>';
         if (it.kind === "desk") html += '<span class="seatNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
+        if (away[st.id]) html += '<span class="seatAwayMark" title="' + (away[st.id] === "out" ? "Out on a pass" : "Absent today") + '">' + (away[st.id] === "out" ? "🚻" : "🚫") + '</span>';
         if (money[st.id]) html += '<span class="seatMoney" title="Correct answers today">' + (money[st.id] > 3 ? "$" + money[st.id] : new Array(money[st.id] + 1).join("$")) + '</span>';
       } else if (it.kind === "desk"){
         html += '<span class="seatEmptyNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
@@ -7035,6 +7595,8 @@ function buildSeatBody(w){
   empty.onclick = editB.onclick;
   printB.onclick = function(){ seatPrintDialog(seatShownPeriod(w)); };
   askB.onclick = function(){ seatAskQuestion(seatShownPeriod(w), wrap.ownerDocument); };
+  function onAway(){ if (!wrap.isConnected){ document.removeEventListener("seatAwayChanged", onAway); return; } api.draw(); }
+  document.addEventListener("seatAwayChanged", onAway);
   saveB.onclick = seatFileDialog;
   updNag();
   var iv = setInterval(function(){
@@ -7259,8 +7821,22 @@ function seatSeated(per){
   return out;
 }
 // everyone answers once before anyone repeats; skipped students stay in the round
+// students marked absent in the Ask view: for today only
+function seatAbsentSet(period){
+  if (!state.seatAbsent || state.seatAbsent.day !== todayKey()) state.seatAbsent = { day: todayKey(), per: {} };
+  return state.seatAbsent.per[period] || (state.seatAbsent.per[period] = {});
+}
+function seatAbsentToday(period){ var a = state.seatAbsent; return a && a.day === todayKey() && a.per[period] ? a.per[period] : {}; }
+// absent or out on a bathroom pass: the spinner skips them
+function seatAway(period){
+  var out = {}, a = seatAbsentToday(period), p = passOutIds(period), k;
+  for (k in a) out[k] = "absent";
+  for (k in p) out[k] = "out";
+  return out;
+}
 function seatPickStudent(period){
-  var per = seatPer(period), c = seatCalls(period), seated = seatSeated(per);
+  var per = seatPer(period), c = seatCalls(period), away = seatAway(period);
+  var seated = seatSeated(per).filter(function(x){ return !away[x.st.id]; });
   if (!seated.length) return null;
   var left = seated.filter(function(x){ return !c.round[x.st.id]; });
   if (!left.length){ c.round = {}; left = seated; }
@@ -7269,12 +7845,25 @@ function seatPickStudent(period){
 }
 function seatRecordCall(period, id, r){
   var c = seatCalls(period);
-  c.today.push({ id: id, r: r, t: Date.now() });
+  // inRound and last: what Undo puts back
+  c.today.push({ id: id, r: r, t: Date.now(), inRound: !!c.round[id], last: c.last });
   if (!c.year[id]) c.year[id] = { c: 0, a: 0, s: 0 };
   c.year[id][r]++;
   if (r !== "s") c.round[id] = 1;
   c.last = id;
   saveState();
+}
+
+// takes back the last Correct / Answered / Skipped of today; returns it, or null
+function seatUndoCall(period){
+  var c = seatCalls(period), e = c.today.pop();
+  if (!e) return null;
+  var y = c.year[e.id];
+  if (y && y[e.r] > 0) y[e.r]--;
+  if (e.inRound) c.round[e.id] = 1; else delete c.round[e.id];
+  c.last = e.last === undefined ? null : e.last;
+  saveState();
+  return e;
 }
 
 var seatAudio = null;
@@ -7343,6 +7932,7 @@ function seatAskQuestion(period, doc){
     '<div class="seatAskTop">' +
       '<h3>❓ Ask a question · ' + escapeHtml(period) + '</h3><span class="seatAskRound"></span>' +
       '<div style="flex:1"></div>' +
+      '<button class="seatBtn seatAskAbsent" title="Click desks to mark students absent for today (the spinner skips them)">🚫 Mark absent</button>' +
       '<button class="seatBtn seatAskSpeed" title="How fast the spin goes"></button><button class="seatBtn seatAskMute"></button><button class="seatBtn seatAskRec">📋 Record</button><button class="seatBtn seatAskClose">Close</button>' +
     '</div>' +
     '<div class="seatAskMain"><div class="seatAskStage"><div class="seatFitHost seatAskHost"></div><div class="seatAskArrows"></div></div><div class="seatAskSide" hidden></div></div>' +
@@ -7358,13 +7948,16 @@ function seatAskQuestion(period, doc){
   var o = { period: period, mode: "view", showTags: false, money: true, maxScale: 3, crop: seatDesksArea };
   var api = seatMount(host, o);
   var pick = null, spinning = false, timer = null;
+  var cashMode = false;     // right after a Correct: clicking other desks gives them cash too
+  var absentMode = false;   // the Mark absent button is on: clicking desks marks absent / here
 
   function slotEl(sid){ return api.room.querySelector('.seatSlot[data-seat="' + (window.CSS && CSS.escape ? CSS.escape(sid) : sid) + '"]'); }
   function redraw(){
     api.draw();
-    var c = seatCalls(period), seated = seatSeated(per), done = 0;
+    var c = seatCalls(period), away = seatAway(period), seated = seatSeated(per).filter(function(x){ return !away[x.st.id]; }), done = 0;
     seated.forEach(function(x){ if (c.round[x.st.id]){ done++; var e = slotEl(x.sid); if (e) e.classList.add("answeredRound"); } });
     ov.querySelector(".seatAskRound").textContent = seated.length ? "This round: " + done + " of " + seated.length + " have answered" : "";
+    ov.classList.toggle("absentMode", absentMode);
     if (!side.hidden) drawRecord();
   }
   function setButtons(){
@@ -7373,10 +7966,15 @@ function seatAskQuestion(period, doc){
       btns.innerHTML = '<button class="seatAskB correct" data-r="c">💲 Correct</button><button class="seatAskB answered" data-r="a">✔ Answered</button><button class="seatAskB skipped" data-r="s">⏭ Skipped</button>';
       [].forEach.call(btns.querySelectorAll("[data-r]"), function(b){ b.onclick = function(){ record(b.getAttribute("data-r")); }; });
     } else {
-      var none = !seatSeated(per).length;
-      btns.innerHTML = '<button class="seatAskB spin"' + (none ? " disabled" : "") + '>🎯 Ask Question</button>';
-      btns.firstChild.onclick = spin;
-      if (none) nameEl.textContent = "No students are in seats for " + period + " yet.";
+      var away = seatAway(period), none = !seatSeated(per).filter(function(x){ return !away[x.st.id]; }).length;
+      var c = seatCalls(period), last = c.today[c.today.length - 1], byId = {};
+      per.students.forEach(function(st){ byId[st.id] = st; });
+      var icon = { c: "💲", a: "✔", s: "⏭" };
+      btns.innerHTML = '<button class="seatAskB spin"' + (none || absentMode ? " disabled" : "") + '>🎯 Ask Question</button>' +
+        (last ? '<button class="seatAskB undo">↩ Undo ' + icon[last.r] + ' ' + escapeHtml(byId[last.id] ? byId[last.id].name : "") + '</button>' : '');
+      btns.querySelector(".spin").onclick = spin;
+      if (last) btns.querySelector(".undo").onclick = undo;
+      if (none && !absentMode) nameEl.textContent = seatSeated(per).length ? "Everyone in " + period + " is absent or out." : "No students are in seats for " + period + " yet.";
     }
   }
   function clearPick(){
@@ -7384,9 +7982,10 @@ function seatAskQuestion(period, doc){
     [].forEach.call(api.room.querySelectorAll(".spinHi,.picked"), function(e){ e.classList.remove("spinHi", "picked"); });
   }
   function spin(){
-    if (spinning) return;
+    if (spinning || absentMode) return;
     var chosen = seatPickStudent(period);
     if (!chosen) return;
+    cashMode = false;
     clearPick(); pick = null; spinning = true; setButtons();
     nameEl.textContent = "🎲 Who will it be…";
     var sp = SEAT_SPIN_SPEEDS[seatSpinSpeed()];
@@ -7455,10 +8054,49 @@ function seatAskQuestion(period, doc){
     if (!pick) return;
     seatRecordCall(period, pick.st.id, r);
     seatSound(r === "c" ? "cash" : "soft");
-    nameEl.innerHTML = '<span class="seatAskSmall">' + (r === "c" ? "💲 " + escapeHtml(pick.st.name) + ": correct!" : r === "a" ? "✔ " + escapeHtml(pick.st.name) + " answered" : "⏭ " + escapeHtml(pick.st.name) + " skipped, still in line") + '</span>';
+    nameEl.innerHTML = '<span class="seatAskSmall">' + (r === "c" ? "💲 " + escapeHtml(pick.st.name) + ": correct! Click other desks to give them cash too." : r === "a" ? "✔ " + escapeHtml(pick.st.name) + " answered" : "⏭ " + escapeHtml(pick.st.name) + " skipped, still in line") + '</span>';
+    cashMode = r === "c";
     pick = null;
     clearPick(); redraw(); setButtons();
   }
+  function undo(){
+    var e = seatUndoCall(period);
+    if (!e) return;
+    var st = seatStudent(per, e.id);
+    nameEl.innerHTML = '<span class="seatAskSmall">↩ Took back ' + (e.r === "c" ? "the cash for " : e.r === "a" ? "the answer for " : "the skip for ") + escapeHtml(st ? st.name : "") + '</span>';
+    seatSound("soft");
+    redraw(); setButtons();
+  }
+  // a desk click: absent mode marks absent / here; right after a Correct it gives cash
+  api.room.addEventListener("click", function(e){
+    var el = e.target.closest && e.target.closest(".seatSlot.filled");
+    if (!el || spinning || pick) return;
+    var sid = el.getAttribute("data-seat"), st = seatStudent(per, per.seats[sid]);
+    if (!st) return;
+    if (absentMode){
+      var a = seatAbsentSet(period);
+      if (a[st.id]) delete a[st.id]; else a[st.id] = 1;
+      saveState();
+      nameEl.innerHTML = '<span class="seatAskSmall">' + (a[st.id] ? "🚫 " + escapeHtml(st.name) + " is absent today" : "✔ " + escapeHtml(st.name) + " is here") + '</span>';
+      redraw(); setButtons();
+      return;
+    }
+    if (!cashMode) return;
+    var why = seatAway(period)[st.id];
+    if (why){ nameEl.innerHTML = '<span class="seatAskSmall">' + escapeHtml(st.name) + (why === "out" ? " is out on a pass." : " is marked absent.") + '</span>'; return; }
+    seatRecordCall(period, st.id, "c");
+    seatSound("cash");
+    nameEl.innerHTML = '<span class="seatAskSmall">💲 ' + escapeHtml(st.name) + ' gets cash too!</span>';
+    redraw(); setButtons();
+  });
+  ov.querySelector(".seatAskAbsent").onclick = function(){
+    if (spinning || pick) return;
+    absentMode = !absentMode; cashMode = false;
+    this.classList.toggle("on", absentMode);
+    this.textContent = absentMode ? "✔ Done marking" : "🚫 Mark absent";
+    nameEl.innerHTML = absentMode ? '<span class="seatAskSmall">Click the desks of students who are absent today. Click again if they\'re here.</span>' : "";
+    redraw(); setButtons();
+  };
   function drawRecord(){
     var c = seatCalls(period), byId = {};
     per.students.forEach(function(s){ byId[s.id] = s; });
@@ -7469,10 +8107,11 @@ function seatAskQuestion(period, doc){
       var t = new Date(x.t);
       return '<tr><td>' + t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + '</td><td>' + escapeHtml(byId[x.id] ? byId[x.id].name : "(removed)") + '</td><td>' + label[x.r] + '</td></tr>';
     }).join("") + '</table>';
-    html += '<div class="seatAskSideH">This year</div><table class="seatAskTbl"><tr><th>Student</th><th title="Correct">💲</th><th title="Answered">✔</th><th title="Skipped">⏭</th></tr>';
+    html += '<div class="seatAskSideH">This year</div><table class="seatAskTbl"><tr><th>Student</th><th title="Correct">💲</th><th title="Answered (correct ones count here too)">✔</th><th title="Skipped">⏭</th></tr>';
     per.students.slice().sort(function(a, b){ return a.name.localeCompare(b.name); }).forEach(function(s){
       var y = c.year[s.id] || { c: 0, a: 0, s: 0 };
-      html += '<tr' + (c.round[s.id] ? ' class="done"' : '') + '><td>' + escapeHtml(s.name) + '</td><td>' + y.c + '</td><td>' + y.a + '</td><td>' + y.s + '</td></tr>';
+      // the ✔ answered column counts correct answers too
+      html += '<tr' + (c.round[s.id] ? ' class="done"' : '') + '><td>' + escapeHtml(s.name) + '</td><td>' + y.c + '</td><td>' + (y.a + y.c) + '</td><td>' + y.s + '</td></tr>';
     });
     html += '</table><div class="seatHint">Faded names have answered in this round. When everyone has answered, a new round starts.</div>' +
       '<button class="seatBtn full seatAskNewRound" style="margin-top:8px">Start a new round now</button>';
@@ -7932,6 +8571,7 @@ if (location.hash === "#join"){
 initJoinFlowIfNeeded();
 } else {
 renderAll();
+critInit();
 window.addEventListener("resize", function(){ /* keep layout as-is; user can drag */ });
 }
 
