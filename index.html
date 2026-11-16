@@ -6132,6 +6132,8 @@ var SEAT_KINDS = {
   board:    { name: "Whiteboard", w: 260, h: 18 },
   screen:   { name: "Screen / TV", w: 160, h: 18 },
   teacher:  { name: "Teacher desk", icon: "🍎", w: 140, h: 70 },
+  teachm:   { name: "Teacher", icon: "👨‍🏫", w: 60, h: 60 },
+  teachf:   { name: "Teacher", icon: "👩‍🏫", w: 60, h: 60 },
   door:     { name: "Door", icon: "🚪", w: 70, h: 18 },
   window:   { name: "Window", w: 150, h: 12 },
   shelf:    { name: "Bookshelf", icon: "📚", w: 130, h: 36 },
@@ -6156,6 +6158,9 @@ var SEAT_PALETTE = [
   { group: "Numbers", items: [
     { kind: "numcircle", name: "① Add number" }, { kind: "numsquare", name: "1 Add number" }
   ]},
+  { group: "Teacher", items: [
+    { kind: "teachm", name: "Teacher" }, { kind: "teachf", name: "Teacher" }
+  ]},
   { group: "Room", items: [
     { kind: "board", name: "Whiteboard" }, { kind: "screen", name: "Screen / TV" },
     { kind: "teacher", name: "Teacher desk" }, { kind: "door", name: "Door" },
@@ -6167,7 +6172,7 @@ var SEAT_PALETTE = [
   ]}
 ];
 var SEAT_TAG_COLORS = ["#3a7bd5","#2f9e44","#e03131","#7048e8","#c2255c","#0c8599","#e67700","#5c940d"];
-var SEAT_RULES_YES = [["none","No rule"],["front","Front of room"],["back","Back of room"],["teacher","Near teacher desk"],["together","Sit together"],["apart","Keep apart"]];
+var SEAT_RULES_YES = [["none","No rule"],["front","Front of room"],["back","Back of room"],["teacher","Near teacher"],["together","Sit together"],["apart","Keep apart"]];
 var SEAT_RULES_LEVEL = [["none","No rule"],["mix","Mix (keep 1s apart)"],["front","1s up front"],["teacher","1s near teacher"]];
 var SEAT_LEVELS = ["", "1 Low", "2 Mid", "3 High"];
 
@@ -6177,6 +6182,7 @@ var SEAT_CSS =
 ".seatWinBar select{flex:1;min-width:90px;border:1px solid #c9c2ac;border-radius:7px;padding:5px;font-size:12px;background:#fff;color:#24303f;font-family:inherit;}" +
 ".seatWinBtn{border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;background:#1f8f7d;color:#fff;}" +
 ".seatWinBtn.alt{background:#e2ddcf;color:#3d3528;}" +
+".seatWinBtn.ask{background:#f08c00;}" +
 ".seatFitHost{position:relative;overflow:hidden;}" +
 ".seatWinBody .seatFitHost{flex:1;min-height:0;margin:0 8px 8px;}" +
 ".seatWinEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#6b6152;font-size:13px;cursor:pointer;}" +
@@ -6220,7 +6226,16 @@ var SEAT_CSS =
 ".seatTableLbl{position:absolute;left:-20px;right:-20px;top:-17px;font-size:11px;font-weight:800;color:#5a4a32;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
 ".seatTags{display:flex;gap:2px;margin-top:2px;flex-wrap:wrap;justify-content:center;}" +
 ".seatTag{font-size:8px;line-height:11px;padding:0 3px;border-radius:5px;color:#fff;font-weight:800;}" +
-".seatLock{position:absolute;right:2px;top:1px;font-size:9px;}";
+".seatLock{position:absolute;right:2px;top:1px;font-size:9px;}" +
+".seatItem.k-teachm,.seatItem.k-teachf{background:radial-gradient(circle at 40% 35%,#fff9db,#ffd43b);border:3px solid #f08c00;border-radius:50%;z-index:3;box-shadow:0 2px 8px rgba(240,140,0,.45);}" +
+".seatItem.k-teachm .seatIco,.seatItem.k-teachf .seatIco{font-size:30px;}" +
+".seatItem.k-teachm .seatLbl,.seatItem.k-teachf .seatLbl{display:none;}" +
+".seatMoney{position:absolute;right:2px;top:2px;font-size:15px;line-height:19px;font-weight:900;color:#fff;background:#2b8a3e;border:2px solid #fff;border-radius:10px;padding:0 5px;box-shadow:0 1px 4px rgba(0,0,0,.35);}" +
+".seatSaveNag{margin:0 8px 6px;padding:6px 9px;border-radius:7px;background:#fff3bf;color:#5c3c00;font-size:12px;font-weight:700;cursor:pointer;}" +
+".seatSlot.spinHi{background:#ffe066 !important;box-shadow:0 0 0 4px #fab005,0 0 26px 8px rgba(250,176,5,.85) !important;z-index:8;}" +
+".seatSlot.picked{background:#ffe066 !important;z-index:8;animation:seatPickGlow .9s ease-in-out infinite alternate;}" +
+"@keyframes seatPickGlow{from{box-shadow:0 0 0 5px #f08c00,0 0 30px 10px rgba(255,212,59,.8);}to{box-shadow:0 0 0 8px #ff6b00,0 0 60px 22px rgba(255,212,59,1);}}" +
+".seatSlot.answeredRound{opacity:.55;}";
 
 var SEAT_ED_CSS =
 ".seatEd{position:fixed;inset:0;z-index:1100;background:#141b26;display:flex;flex-direction:column;color:#e6ebf1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}" +
@@ -6277,7 +6292,52 @@ var SEAT_ED_CSS =
 ".seatGhost{position:fixed;z-index:1300;pointer-events:none;background:#1f8f7d;color:#fff;padding:6px 11px;border-radius:14px;font-weight:700;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.45);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}" +
 ".seatCheck{display:flex;gap:7px;align-items:center;font-size:13px;margin:8px 0;cursor:pointer;}" +
 ".seatCheck input{width:16px;height:16px;accent-color:#1f8f7d;}" +
-"@media (max-width:760px){.seatEdMain{flex-direction:column;}.seatSide{width:auto;max-height:40vh;border-right:none;border-bottom:1px solid #2f3d52;}.seatStage{min-height:50vh;}.seatEdHost{inset:22px 8px 8px 8px;}}";
+"@media (max-width:760px){.seatEdMain{flex-direction:column;}.seatSide{width:auto;max-height:40vh;border-right:none;border-bottom:1px solid #2f3d52;}.seatStage{min-height:50vh;}.seatEdHost{inset:22px 8px 8px 8px;}}" +
+".seatDlgOv{position:fixed;inset:0;z-index:1250;background:rgba(10,14,20,.65);display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}" +
+".seatDlg{background:#1c2534;border:1px solid #2f3d52;border-radius:14px;width:100%;max-width:440px;max-height:88vh;overflow:auto;padding:18px;color:#e6ebf1;}" +
+".seatDlg h3{margin:0 0 8px;font-size:17px;}" +
+".seatDlgNote{font-size:12px;color:#9fb0c4;line-height:1.45;margin:4px 0 8px;}" +
+".seatDlgH{font-size:11px;color:#8fa3ba;text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:14px 0 7px;}" +
+".seatDlgMsg{font-size:13px;color:#8ce99a;min-height:18px;margin-top:8px;}" +
+".seatDlgMsg.bad{color:#ffb4a8;}" +
+".seatDlgBtns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;}" +
+".seatAsk{position:fixed;inset:0;z-index:1150;background:#141b26;display:flex;flex-direction:column;color:#e6ebf1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;outline:none;}" +
+".seatAskTop{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:#1c2534;border-bottom:1px solid #2f3d52;}" +
+".seatAskTop h3{margin:0;font-size:17px;}" +
+".seatAskRound{font-size:13px;color:#9fb0c4;margin-left:8px;}" +
+".seatAskMain{flex:1;min-height:0;display:flex;}" +
+".seatAskStage{flex:1;min-width:0;position:relative;}" +
+".seatAskHost{position:absolute;inset:16px;}" +
+".seatAskArrows{position:absolute;inset:0;pointer-events:none;z-index:20;}" +
+".seatArrow{position:absolute;filter:drop-shadow(0 0 10px #ffd43b) drop-shadow(0 0 22px #ff9f1a);}" +
+".seatArrow svg{width:100%;height:100%;display:block;}" +
+".seatArrow.a-d{animation:seatBobD .6s ease-in-out infinite alternate;}" +
+".seatArrow.a-u{animation:seatBobU .6s ease-in-out infinite alternate;}" +
+".seatArrow.a-r{animation:seatBobR .6s ease-in-out infinite alternate;}" +
+".seatArrow.a-l{animation:seatBobL .6s ease-in-out infinite alternate;}" +
+"@keyframes seatBobD{from{transform:translateY(-14px)}to{transform:translateY(6px)}}" +
+"@keyframes seatBobU{from{transform:translateY(14px)}to{transform:translateY(-6px)}}" +
+"@keyframes seatBobR{from{transform:translateX(-14px)}to{transform:translateX(6px)}}" +
+"@keyframes seatBobL{from{transform:translateX(14px)}to{transform:translateX(-6px)}}" +
+".seatAskSide{width:330px;flex:none;overflow:auto;padding:12px;background:#18202d;border-left:1px solid #2f3d52;box-sizing:border-box;}" +
+".seatAskSide[hidden]{display:none;}" +
+".seatAskSideH{font-size:11px;color:#8fa3ba;text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:12px 0 6px;}" +
+".seatAskSideH:first-child{margin-top:0;}" +
+".seatAskTbl{width:100%;border-collapse:collapse;font-size:13px;}" +
+".seatAskTbl td,.seatAskTbl th{padding:4px 5px;border-bottom:1px solid #222d3e;text-align:left;}" +
+".seatAskTbl th{font-size:12px;color:#8fa3ba;}" +
+".seatAskTbl tr.done td{opacity:.5;}" +
+".seatAskBottom{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;padding:12px 16px 16px;background:#1c2534;border-top:1px solid #2f3d52;}" +
+".seatAskName{font-size:clamp(24px,4vw,46px);font-weight:900;color:#ffe066;text-shadow:0 0 18px rgba(255,212,59,.55);text-align:center;min-height:1.2em;}" +
+".seatAskSmall{font-size:clamp(18px,2.4vw,28px);}" +
+".seatAskBtns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}" +
+".seatAskB{border:none;border-radius:12px;padding:14px 22px;font-size:18px;font-weight:900;cursor:pointer;font-family:inherit;color:#fff;}" +
+".seatAskB:disabled{opacity:.45;cursor:default;}" +
+".seatAskB.spin{background:#f08c00;font-size:22px;padding:16px 34px;}" +
+".seatAskB.correct{background:#2b8a3e;}" +
+".seatAskB.answered{background:#1971c2;}" +
+".seatAskB.skipped{background:#495057;}" +
+"@media (max-width:760px){.seatAskSide{position:absolute;right:0;top:0;bottom:0;width:86vw;z-index:30;}}";
 
 function seatCss(doc){
   if (doc.getElementById("seatCss")) return;
@@ -6484,7 +6544,7 @@ function seatTagChips(st){
 // o: { period, mode: "view"|"room"|"seats", showTags, sel, bad }
 function seatDraw(room, o){
   var ss = seatState(), doc = room.ownerDocument;
-  var per = o.period ? seatPer(o.period) : null, byId = {};
+  var per = o.period ? seatPer(o.period) : null, byId = {}, money = o.money && o.period ? seatMoneyToday(o.period) : {};
   if (per) for (var b=0;b<per.students.length;b++) byId[per.students[b].id] = per.students[b];
   room.innerHTML = "";
   room.style.width = SEAT_W + "px";
@@ -6525,6 +6585,7 @@ function seatDraw(room, o){
         if (o.showTags) html += seatTagChips(st);
         if (o.mode === "seats" && st.lock === sid) html += '<span class="seatLock">🔒</span>';
         if (it.kind === "desk") html += '<span class="seatNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
+        if (money[st.id]) html += '<span class="seatMoney" title="Correct answers today">' + (money[st.id] > 3 ? "$" + money[st.id] : new Array(money[st.id] + 1).join("$")) + '</span>';
       } else if (it.kind === "desk"){
         html += '<span class="seatEmptyNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
       }
@@ -6588,15 +6649,17 @@ function seatModel(){
       var m = Infinity;
       for (var r=0;r<refs.length;r++){
         var rf = refs[r], dx = Math.max(rf.x - s.cx, 0, s.cx - (rf.x + rf.w)), dy = Math.max(rf.y - s.cy, 0, s.cy - (rf.y + rf.h));
-        // sitting off to the side matters less than sitting rows back from a long board
-        if (rf.w >= rf.h) dx *= 0.4; else dy *= 0.4;
+        // sitting off to the side matters less than sitting rows back from a long board (where the teacher stands is a plain distance)
+        if (seatIsTeachSpot(rf.kind)){} else if (rf.w >= rf.h) dx *= 0.4; else dy *= 0.4;
         m = Math.min(m, Math.sqrt(dx*dx + dy*dy));
       }
       return m;
     }));
   }
-  var front = distTo(["board", "screen"]) || norm(seats.map(function(s){ return s.cy; }));
-  var teacher = distTo(["teacher"]) || front;
+  // where the teacher stands, when placed, is the front of the room and the teacher for the rules
+  var spot = distTo(["teachm", "teachf"]);
+  var front = spot || distTo(["board", "screen"]) || norm(seats.map(function(s){ return s.cy; }));
+  var teacher = spot || distTo(["teacher"]) || front;
   var near = [], far = [];
   for (var p=0;p<n;p++){
     for (var q=p+1;q<n;q++){
@@ -6676,7 +6739,7 @@ function seatReport(per){
   for (var id in groups){
     var g = groups[id], nm = g.tag.name, rule = g.tag.rule;
     if (g.pos.length){
-      var where = rule === "front" ? "in the front third of the room" : rule === "back" ? "in the back third of the room" : "close to the teacher desk";
+      var where = rule === "front" ? "in the front third of the room" : rule === "back" ? "in the back third of the room" : "close to the teacher";
       lines.push((g.tag.kind === "level" ? nm + " 1" : nm) + ": " + seatNamesList(g.pos) + (g.pos.length === 1 ? " isn't " : " aren't ") + where + ".");
     }
     if (g.alone.length) lines.push(nm + ": " + seatNamesList(g.alone) + (g.alone.length === 1 ? " has" : " have") + " no other " + nm + " student next to them.");
@@ -6763,8 +6826,15 @@ function seatNextNumber(kind){
   }
   return mx + 1;
 }
+function seatIsTeachSpot(kind){ return kind === "teachm" || kind === "teachf"; }
 function seatNewItem(spec, x, y){
   var ss = seatState(), kd = SEAT_KINDS[spec.kind];
+  // the teacher spot is one spot for every period: a new one replaces the old one, in the same place unless dropped somewhere
+  if (seatIsTeachSpot(spec.kind)){
+    var old = ss.items.filter(function(i){ return seatIsTeachSpot(i.kind); })[0];
+    ss.items = ss.items.filter(function(i){ return !seatIsTeachSpot(i.kind); });
+    if (old && x == null){ x = old.x + old.w / 2; y = old.y + old.h / 2; }
+  }
   var it = { id: seatUid("si_"), kind: spec.kind, w: spec.w || kd.w, h: spec.h || kd.h, x: 0, y: 0 };
   if (spec.kind === "table" || spec.kind === "round") it.seats = spec.seats || kd.seats;
   if (spec.kind === "desk") it.label = String(seatNextNumber("desk"));
@@ -6925,8 +6995,16 @@ function buildSeatBody(w){
   editB.className = "seatWinBtn"; editB.textContent = "✏️ Edit";
   var printB = document.createElement("button");
   printB.className = "seatWinBtn alt"; printB.textContent = "🖨"; printB.title = "Print or save as PDF";
-  bar.appendChild(sel); bar.appendChild(editB); bar.appendChild(printB);
+  var askB = document.createElement("button");
+  askB.className = "seatWinBtn ask"; askB.textContent = "❓ Ask"; askB.title = "Ask a question: spin to call on a student";
+  var saveB = document.createElement("button");
+  saveB.className = "seatWinBtn alt"; saveB.textContent = "💾"; saveB.title = "Save or load the seating charts as a file";
+  bar.appendChild(sel); bar.appendChild(askB); bar.appendChild(editB); bar.appendChild(printB); bar.appendChild(saveB);
   wrap.appendChild(bar);
+  var nag = document.createElement("div");
+  nag.className = "seatSaveNag";
+  nag.textContent = "💾 Your seating charts have unsaved changes from over " + SEAT_SAVE_DAYS + " days ago. Click to save a file.";
+  nag.onclick = seatFileDialog;
   var host = document.createElement("div");
   host.className = "seatFitHost";
   wrap.appendChild(host);
@@ -6942,8 +7020,13 @@ function buildSeatBody(w){
     sel.innerHTML = html;
     sel.value = w.period || "auto";
   }
-  var o = { period: seatShownPeriod(w), mode: "view", showTags: false };
+  var o = { period: seatShownPeriod(w), mode: "view", showTags: false, money: true };
   var api = seatMount(host, o);
+  function updNag(){
+    var need = seatNeedsSave();
+    if (need && !nag.parentNode) wrap.insertBefore(nag, host);
+    if (!need && nag.parentNode) wrap.removeChild(nag);
+  }
   // drag names right on the board; the move overrides the rules and locks the student there
   api.room.addEventListener("pointerdown", function(e){ seatSlotDown(e, seatPer(o.period), function(){ api.draw(); }); });
   function updEmpty(){
@@ -6957,12 +7040,411 @@ function buildSeatBody(w){
   editB.onclick = function(){ seatOpenEditor(seatShownPeriod(w)); };
   empty.onclick = editB.onclick;
   printB.onclick = function(){ seatPrintDialog(seatShownPeriod(w)); };
+  askB.onclick = function(){ seatAskQuestion(seatShownPeriod(w)); };
+  saveB.onclick = seatFileDialog;
+  updNag();
   var iv = setInterval(function(){
     if (!wrap.isConnected){ clearInterval(iv); return; }
+    updNag();
     var p = seatShownPeriod(w);
     if (p !== o.period){ o.period = p; api.draw(); fillSel(); }
   }, 30000);
   return wrap;
+}
+
+/* ---------- save file: the seating charts as a text (.json) file on the computer ---------- */
+var SEAT_SAVE_DAYS = 7;   // remind after this many days with unsaved changes
+function seatHash(){
+  var s = JSON.stringify(seatState()), h = 5381;
+  for (var i=0;i<s.length;i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return String(h);
+}
+function seatSaveInfo(){ if (!state.seatSave) state.seatSave = {}; return state.seatSave; }
+function seatHasStudents(){
+  var ps = seatState().periods;
+  for (var k in ps) if (ps[k].students && ps[k].students.length) return true;
+  return false;
+}
+// unsaved changes older than SEAT_SAVE_DAYS
+function seatNeedsSave(){
+  var info = seatSaveInfo(), h = seatHash();
+  if (!seatHasStudents() || info.hash === h){ if (info.dirtyAt){ delete info.dirtyAt; saveState(); } return false; }
+  if (!info.dirtyAt){ info.dirtyAt = Date.now(); saveState(); }
+  return Date.now() - Math.max(info.at || 0, info.dirtyAt) >= SEAT_SAVE_DAYS * 86400000;
+}
+function seatMarkSaved(){ var info = seatSaveInfo(); info.at = Date.now(); info.hash = seatHash(); delete info.dirtyAt; saveState(); }
+function seatSaveText(){
+  return JSON.stringify({ app: "teacherbase-seating", version: 1, savedAt: new Date().toISOString(), seating: seatState() }, null, 2);
+}
+function seatDownload(){
+  var blob = new Blob([seatSaveText()], { type: "application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "seating-" + todayKey() + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  seatMarkSaved();
+}
+// Chrome and Edge can keep writing to one file; the file's handle is kept in IndexedDB between visits
+var seatFileHandle = null;
+function seatIdb(mode, fn){
+  return new Promise(function(res, rej){
+    if (!window.indexedDB) return rej(new Error("no idb"));
+    var rq = indexedDB.open("teacherbaseFiles", 1);
+    rq.onupgradeneeded = function(){ rq.result.createObjectStore("handles"); };
+    rq.onerror = function(){ rej(rq.error); };
+    rq.onsuccess = function(){
+      var tx = rq.result.transaction("handles", mode), r = fn(tx.objectStore("handles"));
+      tx.oncomplete = function(){ res(r && r.result); };
+      tx.onerror = function(){ rej(tx.error); };
+    };
+  });
+}
+function seatGetHandle(){
+  if (seatFileHandle) return Promise.resolve(seatFileHandle);
+  return seatIdb("readonly", function(s){ return s.get("seating"); }).then(function(h){ seatFileHandle = h || null; return seatFileHandle; }, function(){ return null; });
+}
+function seatSaveToFile(pickNew){
+  return (pickNew ? Promise.resolve(null) : seatGetHandle()).then(function(h){
+    if (h) return h.queryPermission({ mode: "readwrite" }).then(function(p){ return p === "granted" ? p : h.requestPermission({ mode: "readwrite" }); })
+      .then(function(p){ if (p !== "granted") throw new Error("Permission to save to " + h.name + " was not given."); return h; });
+    return window.showSaveFilePicker({ suggestedName: "seating-chart.json", types: [{ description: "Seating chart save file", accept: { "application/json": [".json"] } }] })
+      .then(function(nh){ seatFileHandle = nh; return seatIdb("readwrite", function(s){ return s.put(nh, "seating"); }).then(function(){ return nh; }, function(){ return nh; }); });
+  }).then(function(h){
+    return h.createWritable().then(function(w){ return w.write(seatSaveText()).then(function(){ return w.close(); }); }).then(function(){ seatMarkSaved(); return h.name; });
+  });
+}
+// a seating save file, or a whole teacherbase export (it has the seating inside)
+function seatReadSave(text){
+  var d = JSON.parse(text), s = d && d.seating;
+  if (!s || !Array.isArray(s.items) || !s.periods || typeof s.periods !== "object") throw new Error("not a seating file");
+  return s;
+}
+function seatLoad(fileSeat, periods, withRoom){
+  var ss = seatState(), copy = JSON.parse(JSON.stringify(fileSeat));
+  if (withRoom){ ss.items = copy.items; if (Array.isArray(copy.tags)) ss.tags = copy.tags; }
+  for (var i=0;i<periods.length;i++){
+    var p = copy.periods[periods[i]];
+    ss.periods[periods[i]] = { students: Array.isArray(p.students) ? p.students : [], seats: p.seats || {} };
+  }
+  for (var k in ss.periods) seatSanitize(ss.periods[k]);
+  saveState();
+}
+
+function seatFileDialog(){
+  var ov = document.createElement("div");
+  ov.className = "seatDlgOv";
+  var card = document.createElement("div");
+  card.className = "seatDlg";
+  ov.appendChild(card);
+  document.body.appendChild(ov);
+  function close(){ ov.remove(); renderAll(); }
+  ov.addEventListener("mousedown", function(e){ if (e.target === ov) close(); });
+  ov.addEventListener("keydown", function(e){ e.stopPropagation(); if (e.key === "Escape") close(); });
+  var canFile = !!window.showSaveFilePicker;
+  function main(msg, bad){
+    var info = seatSaveInfo();
+    card.innerHTML =
+      '<h3>💾 Save or load seating charts</h3>' +
+      '<p class="seatDlgNote">Saves the room, tags, and every period\'s students and seats in a text file (.json) on this computer, so nothing is lost if this browser is cleared. ' +
+      (info.at ? "Last saved " + new Date(info.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) + "." : "Not saved yet.") + '</p>' +
+      '<div class="seatDlgH">Save</div>' +
+      '<button class="seatBtn go full" data-a="dl">⬇ Download a save file (seating-' + todayKey() + '.json)</button>' +
+      (canFile ? '<button class="seatBtn full" data-a="file">💾 Save to my file</button><button class="seatBtn full" data-a="newfile">Choose a different file…</button>' +
+        '<div class="seatDlgNote">Save to my file: pick a file once, and later saves write over that same file.</div>'
+        : '<div class="seatDlgNote">Saving over the same file each time works in Chrome or Edge.</div>') +
+      '<div class="seatDlgH">Load</div>' +
+      '<button class="seatBtn full" data-a="load">📂 Load from a save file…</button>' +
+      '<div class="seatDlgMsg' + (bad ? " bad" : "") + '">' + (msg ? escapeHtml(msg) : "") + '</div>' +
+      '<div class="seatDlgBtns"><button class="seatBtn" data-a="close">Close</button></div>';
+    if (canFile) seatGetHandle().then(function(h){ var b = card.querySelector('[data-a="file"]'); if (h && b) b.textContent = "💾 Save to " + h.name; });
+    card.querySelector('[data-a="dl"]').onclick = function(){ seatDownload(); main("Downloaded. It's in your Downloads folder."); };
+    if (canFile){
+      card.querySelector('[data-a="file"]').onclick = function(){ save(false); };
+      card.querySelector('[data-a="newfile"]').onclick = function(){ save(true); };
+    }
+    card.querySelector('[data-a="load"]').onclick = pick;
+    card.querySelector('[data-a="close"]').onclick = close;
+  }
+  function save(pickNew){
+    seatSaveToFile(pickNew).then(function(name){ main("Saved to " + name + "."); },
+      function(e){ if (e && e.name === "AbortError") return; main("Couldn't save: " + (e && e.message || e), true); });
+  }
+  function pick(){
+    var inp = document.createElement("input");
+    inp.type = "file"; inp.accept = ".json,.txt,application/json,text/plain";
+    inp.onchange = function(){
+      var f = inp.files && inp.files[0];
+      if (!f) return;
+      f.text().then(function(t){
+        var s;
+        try { s = seatReadSave(t); } catch(e){ main("That file isn't a seating chart save file.", true); return; }
+        choose(s, f.name);
+      });
+    };
+    inp.click();
+  }
+  function choose(s, fname){
+    var names = Object.keys(s.periods).filter(function(k){ return s.periods[k] && Array.isArray(s.periods[k].students) && s.periods[k].students.length; });
+    var html = '<h3>📂 Load from ' + escapeHtml(fname) + '</h3>' +
+      '<p class="seatDlgNote">Tick what to load. Each period you tick replaces that period here. Periods you don\'t tick stay as they are.</p>' +
+      '<label class="seatCheck"><input type="checkbox" data-room checked> Room layout and tags</label>';
+    if (!names.length) html += '<div class="seatDlgNote">No periods with students in this file.</div>';
+    names.forEach(function(k){
+      html += '<label class="seatCheck"><input type="checkbox" data-per="' + escapeHtml(k) + '" checked> ' + escapeHtml(k) + ' <span class="seatDlgNote">(' + s.periods[k].students.length + (s.periods[k].students.length === 1 ? ' student' : ' students') + ')</span></label>';
+    });
+    html += '<div class="seatDlgBtns"><button class="seatBtn" data-a="back">Back</button><button class="seatBtn" data-a="some">Load ticked</button><button class="seatBtn go" data-a="all">Load all</button></div>';
+    card.innerHTML = html;
+    card.querySelector('[data-a="back"]').onclick = function(){ main(); };
+    card.querySelector('[data-a="all"]').onclick = function(){
+      var ss = seatState(), copy = JSON.parse(JSON.stringify(s));
+      ss.items = copy.items; if (Array.isArray(copy.tags)) ss.tags = copy.tags; ss.periods = copy.periods;
+      for (var k in ss.periods) seatSanitize(ss.periods[k]);
+      seatMarkSaved();
+      main("Loaded everything from " + fname + ".");
+    };
+    card.querySelector('[data-a="some"]').onclick = function(){
+      var pers = [].map.call(card.querySelectorAll("[data-per]:checked"), function(cb){ return cb.getAttribute("data-per"); });
+      var room = card.querySelector("[data-room]").checked;
+      if (!pers.length && !room) return;
+      seatLoad(s, pers, room);
+      main("Loaded " + [room ? "the room layout and tags" : ""].concat(pers).filter(Boolean).join(", ") + ".");
+    };
+  }
+  main();
+}
+
+/* ---------- Ask Question: spin around the seats and call on one student ---------- */
+// per period: the current round (who has answered), today's list and the year's counts.
+// Kept apart from state.seating, so it stays out of the save file.
+function seatCalls(period){
+  if (!state.seatCalls) state.seatCalls = {};
+  var c = state.seatCalls[period];
+  if (!c) c = state.seatCalls[period] = { round: {}, last: null, day: todayKey(), today: [], year: {} };
+  if (c.day !== todayKey()){ c.day = todayKey(); c.today = []; }
+  return c;
+}
+function seatMoneyToday(period){
+  var c = state.seatCalls && state.seatCalls[period], m = {};
+  if (!c || c.day !== todayKey()) return m;
+  c.today.forEach(function(x){ if (x.r === "c") m[x.id] = (m[x.id] || 0) + 1; });
+  return m;
+}
+function seatSeated(per){
+  var out = [];
+  for (var k in per.seats){ var st = seatStudent(per, per.seats[k]); if (st) out.push({ st: st, sid: k }); }
+  return out;
+}
+// everyone answers once before anyone repeats; skipped students stay in the round
+function seatPickStudent(period){
+  var per = seatPer(period), c = seatCalls(period), seated = seatSeated(per);
+  if (!seated.length) return null;
+  var left = seated.filter(function(x){ return !c.round[x.st.id]; });
+  if (!left.length){ c.round = {}; left = seated; }
+  if (left.length > 1) left = left.filter(function(x){ return x.st.id !== c.last; });
+  return left[Math.floor(Math.random() * left.length)];
+}
+function seatRecordCall(period, id, r){
+  var c = seatCalls(period);
+  c.today.push({ id: id, r: r, t: Date.now() });
+  if (!c.year[id]) c.year[id] = { c: 0, a: 0, s: 0 };
+  c.year[id][r]++;
+  if (r !== "s") c.round[id] = 1;
+  c.last = id;
+  saveState();
+}
+
+var seatAudio = null;
+function seatSound(kind){
+  if (state.seatCallsMute) return;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  if (!seatAudio) seatAudio = new AC();
+  var ac = seatAudio, t0 = ac.currentTime;
+  if (ac.state === "suspended") ac.resume();
+  function note(f, start, dur, type, vol){
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t0 + start);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + start + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t0 + start); o.stop(t0 + start + dur + 0.02);
+  }
+  function noise(start, dur, vol){
+    var len = Math.floor(ac.sampleRate * dur), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (var i=0;i<len;i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    var src = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = buf; hp.type = "highpass"; hp.frequency.value = 3000; g.gain.value = vol;
+    src.connect(hp); hp.connect(g); g.connect(ac.destination);
+    src.start(t0 + start);
+  }
+  if (kind === "tick") note(1500, 0, 0.04, "square", 0.05);
+  else if (kind === "ding"){ note(880, 0, 0.9, "sine", 0.3); note(1320, 0, 0.7, "sine", 0.15); note(1760, 0.02, 0.5, "sine", 0.08); }
+  else if (kind === "cash"){
+    // cha-ching: the drawer's two clanks, then the bell
+    noise(0, 0.09, 0.35); note(2100, 0, 0.12, "triangle", 0.15);
+    noise(0.13, 0.12, 0.4); note(2600, 0.13, 0.14, "triangle", 0.18);
+    note(1568, 0.26, 1.1, "sine", 0.3); note(2349, 0.26, 0.9, "sine", 0.18); note(3136, 0.27, 0.6, "sine", 0.1);
+  }
+  else if (kind === "soft") note(440, 0, 0.25, "sine", 0.15);
+}
+
+function seatAskQuestion(period){
+  seatCss(document);
+  var per = seatPer(period);
+  var ov = document.createElement("div");
+  ov.className = "seatAsk";
+  ov.tabIndex = -1;
+  ov.innerHTML =
+    '<div class="seatAskTop">' +
+      '<h3>❓ Ask a question · ' + escapeHtml(period) + '</h3><span class="seatAskRound"></span>' +
+      '<div style="flex:1"></div>' +
+      '<button class="seatBtn seatAskMute"></button><button class="seatBtn seatAskRec">📋 Record</button><button class="seatBtn seatAskClose">Close</button>' +
+    '</div>' +
+    '<div class="seatAskMain"><div class="seatAskStage"><div class="seatFitHost seatAskHost"></div><div class="seatAskArrows"></div></div><div class="seatAskSide" hidden></div></div>' +
+    '<div class="seatAskBottom">' +
+      '<div class="seatAskName"></div>' +
+      '<div class="seatAskBtns"></div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.focus();
+  var host = ov.querySelector(".seatAskHost"), arrows = ov.querySelector(".seatAskArrows"), side = ov.querySelector(".seatAskSide");
+  var nameEl = ov.querySelector(".seatAskName"), btns = ov.querySelector(".seatAskBtns");
+  var o = { period: period, mode: "view", showTags: false, money: true };
+  var api = seatMount(host, o);
+  var pick = null, spinning = false, timer = null;
+
+  function slotEl(sid){ return api.room.querySelector('.seatSlot[data-seat="' + (window.CSS && CSS.escape ? CSS.escape(sid) : sid) + '"]'); }
+  function redraw(){
+    api.draw();
+    var c = seatCalls(period), seated = seatSeated(per), done = 0;
+    seated.forEach(function(x){ if (c.round[x.st.id]){ done++; var e = slotEl(x.sid); if (e) e.classList.add("answeredRound"); } });
+    ov.querySelector(".seatAskRound").textContent = seated.length ? "This round: " + done + " of " + seated.length + " have answered" : "";
+    if (!side.hidden) drawRecord();
+  }
+  function setButtons(){
+    if (spinning){ btns.innerHTML = ""; return; }
+    if (pick){
+      btns.innerHTML = '<button class="seatAskB correct" data-r="c">💲 Correct</button><button class="seatAskB answered" data-r="a">✔ Answered</button><button class="seatAskB skipped" data-r="s">⏭ Skipped</button>';
+      [].forEach.call(btns.querySelectorAll("[data-r]"), function(b){ b.onclick = function(){ record(b.getAttribute("data-r")); }; });
+    } else {
+      var none = !seatSeated(per).length;
+      btns.innerHTML = '<button class="seatAskB spin"' + (none ? " disabled" : "") + '>🎯 Ask Question</button>';
+      btns.firstChild.onclick = spin;
+      if (none) nameEl.textContent = "No students are in seats for " + period + " yet.";
+    }
+  }
+  function clearPick(){
+    arrows.innerHTML = "";
+    [].forEach.call(api.room.querySelectorAll(".spinHi,.picked"), function(e){ e.classList.remove("spinHi", "picked"); });
+  }
+  function spin(){
+    if (spinning) return;
+    var chosen = seatPickStudent(period);
+    if (!chosen) return;
+    clearPick(); pick = null; spinning = true; setButtons();
+    nameEl.textContent = "🎲 Who will it be…";
+    var seated = seatSeated(per), steps = [], prev = null, n = 26 + Math.floor(Math.random() * 6);
+    for (var i=0;i<n;i++){
+      var x;
+      do { x = seated[Math.floor(Math.random() * seated.length)]; } while (seated.length > 1 && x.sid === prev);
+      steps.push(x.sid); prev = x.sid;
+    }
+    if (steps[steps.length-1] === chosen.sid && seated.length > 1) steps.pop();
+    steps.push(chosen.sid);
+    var i2 = 0, delay = 45;
+    (function step(){
+      [].forEach.call(api.room.querySelectorAll(".spinHi"), function(e){ e.classList.remove("spinHi"); });
+      var e = slotEl(steps[i2]);
+      if (e) e.classList.add("spinHi");
+      seatSound("tick");
+      i2++;
+      if (i2 < steps.length){
+        // slows down near the end
+        delay = i2 < steps.length - 10 ? 45 + i2 * 2 : delay * 1.28;
+        timer = setTimeout(step, delay);
+      } else {
+        timer = setTimeout(function(){ land(chosen); }, 250);
+      }
+    })();
+  }
+  function land(chosen){
+    spinning = false; pick = chosen;
+    var e = slotEl(chosen.sid);
+    if (e){ e.classList.remove("spinHi"); e.classList.add("picked"); }
+    seatSound("ding");
+    nameEl.innerHTML = "🎤 " + escapeHtml(chosen.st.name);
+    placeArrows();
+    setButtons();
+  }
+  // four big glowing arrows that bob toward the picked seat
+  function placeArrows(){
+    arrows.innerHTML = "";
+    if (!pick) return;
+    var e = slotEl(pick.sid);
+    if (!e) return;
+    var r = e.getBoundingClientRect(), base = arrows.getBoundingClientRect();
+    var cx = r.left + r.width / 2 - base.left, cy = r.top + r.height / 2 - base.top;
+    var size = Math.max(70, Math.min(150, Math.min(base.width, base.height) * 0.14));
+    var dirs = [["d", 0, -1], ["u", 0, 1], ["r", -1, 0], ["l", 1, 0]];
+    dirs.forEach(function(d){
+      var a = document.createElement("div");
+      a.className = "seatArrow a-" + d[0];
+      var gapX = r.width / 2 + size * 0.62, gapY = r.height / 2 + size * 0.62;
+      a.style.width = a.style.height = size + "px";
+      a.style.left = (cx + d[1] * gapX - size / 2) + "px";
+      a.style.top = (cy + d[2] * gapY - size / 2) + "px";
+      // drawn pointing down, then turned toward the seat
+      var rot = { d: 0, u: 180, r: -90, l: 90 }[d[0]];
+      a.innerHTML = '<svg viewBox="0 0 100 100" style="transform:rotate(' + rot + 'deg)"><path d="M32 4h36v46h22L50 96 10 50h22z" fill="url(#seatArrowFill)" stroke="#7a3b00" stroke-width="4" stroke-linejoin="round"/>' +
+        '<defs><linearGradient id="seatArrowFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3a0"/><stop offset="1" stop-color="#ff9f1a"/></linearGradient></defs></svg>';
+      arrows.appendChild(a);
+    });
+  }
+  function record(r){
+    if (!pick) return;
+    seatRecordCall(period, pick.st.id, r);
+    seatSound(r === "c" ? "cash" : "soft");
+    nameEl.innerHTML = '<span class="seatAskSmall">' + (r === "c" ? "💲 " + escapeHtml(pick.st.name) + ": correct!" : r === "a" ? "✔ " + escapeHtml(pick.st.name) + " answered" : "⏭ " + escapeHtml(pick.st.name) + " skipped, still in line") + '</span>';
+    pick = null;
+    clearPick(); redraw(); setButtons();
+  }
+  function drawRecord(){
+    var c = seatCalls(period), byId = {};
+    per.students.forEach(function(s){ byId[s.id] = s; });
+    var label = { c: "💲 Correct", a: "✔ Answered", s: "⏭ Skipped" };
+    var html = '<div class="seatAskSideH">Today</div>';
+    if (!c.today.length) html += '<div class="seatHint">No one called on yet today.</div>';
+    else html += '<table class="seatAskTbl">' + c.today.map(function(x){
+      var t = new Date(x.t);
+      return '<tr><td>' + t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + '</td><td>' + escapeHtml(byId[x.id] ? byId[x.id].name : "(removed)") + '</td><td>' + label[x.r] + '</td></tr>';
+    }).join("") + '</table>';
+    html += '<div class="seatAskSideH">This year</div><table class="seatAskTbl"><tr><th>Student</th><th title="Correct">💲</th><th title="Answered">✔</th><th title="Skipped">⏭</th></tr>';
+    per.students.slice().sort(function(a, b){ return a.name.localeCompare(b.name); }).forEach(function(s){
+      var y = c.year[s.id] || { c: 0, a: 0, s: 0 };
+      html += '<tr' + (c.round[s.id] ? ' class="done"' : '') + '><td>' + escapeHtml(s.name) + '</td><td>' + y.c + '</td><td>' + y.a + '</td><td>' + y.s + '</td></tr>';
+    });
+    html += '</table><div class="seatHint">Faded names have answered in this round. When everyone has answered, a new round starts.</div>' +
+      '<button class="seatBtn full seatAskNewRound" style="margin-top:8px">Start a new round now</button>';
+    side.innerHTML = html;
+    side.querySelector(".seatAskNewRound").onclick = function(){
+      showConfirm("Start a new round for " + period + "? Everyone can be called on again.", function(ok){ if (ok){ seatCalls(period).round = {}; saveState(); redraw(); } });
+    };
+  }
+  function muteLabel(){ ov.querySelector(".seatAskMute").textContent = state.seatCallsMute ? "🔇 Sound off" : "🔊 Sound on"; }
+  ov.querySelector(".seatAskMute").onclick = function(){ state.seatCallsMute = !state.seatCallsMute; saveState(); muteLabel(); };
+  ov.querySelector(".seatAskRec").onclick = function(){ side.hidden = !side.hidden; if (!side.hidden) drawRecord(); setTimeout(function(){ api.fitNow(); placeArrows(); }, 0); };
+  function close(){ clearTimeout(timer); window.removeEventListener("resize", onResize); ov.remove(); renderAll(); }
+  ov.querySelector(".seatAskClose").onclick = close;
+  function onResize(){ setTimeout(placeArrows, 50); }
+  window.addEventListener("resize", onResize);
+  ov.addEventListener("keydown", function(e){
+    e.stopPropagation();
+    if (e.key === "Escape") close();
+    else if ((e.key === " " || e.key === "Enter") && !pick && !spinning && e.target === ov){ e.preventDefault(); spin(); }
+  });
+  muteLabel(); redraw(); setButtons();
 }
 
 /* ---------- full-screen editor ---------- */
@@ -6981,6 +7463,7 @@ function seatOpenEditor(period){
       '<select class="seatEdPer" title="Class period"></select>' +
       '<div class="seatTabs"><button class="seatTab" data-m="room">1 · Room</button><button class="seatTab" data-m="students">2 · Students</button><button class="seatTab" data-m="seats">3 · Seats</button></div>' +
       '<div style="flex:1"></div>' +
+      '<button class="seatBtn seatEdSave">💾 Save / Load</button>' +
       '<button class="seatBtn seatEdPrint">🖨 Print</button>' +
       '<button class="seatBtn go seatEdDone">Done</button>' +
     '</div>' +
@@ -7002,6 +7485,11 @@ function seatOpenEditor(period){
     tabs[ti].onclick = function(){ ed.mode = this.getAttribute("data-m"); ed.sel = null; render(); };
   }
   root.querySelector(".seatEdPrint").onclick = function(){ seatPrintDialog(ed.period); };
+  root.querySelector(".seatEdSave").onclick = function(){
+    seatFileDialog();
+    // a loaded file changes the room and students under the open editor
+    var t = setInterval(function(){ if (!document.querySelector(".seatDlgOv")){ clearInterval(t); if (root.parentNode){ fillPer(); render(); } } }, 300);
+  };
   function close(){
     document.removeEventListener("keydown", onKey);
     if (root.parentNode) document.body.removeChild(root);
@@ -7085,7 +7573,7 @@ function seatOpenEditor(period){
 
     for (var g=0;g<SEAT_PALETTE.length;g++){
       var grp = SEAT_PALETTE[g].group;
-      head(grp === "Seats" ? "Seats & tables" : grp === "Numbers" ? "Number markers" : "Room items");
+      head(grp === "Seats" ? "Seats & tables" : grp === "Numbers" ? "Number markers" : grp === "Teacher" ? "Where you usually stand" : "Room items");
       var pal = el("div", "seatPal");
       SEAT_PALETTE[g].items.forEach(function(spec){
         var kd = SEAT_KINDS[spec.kind];
@@ -7097,7 +7585,7 @@ function seatOpenEditor(period){
       });
       side.appendChild(pal);
     }
-    hint("Drag an item onto the room, or click it to drop it in an open spot. Front of the room = closest to the whiteboard or screen.");
+    hint("Drag an item onto the room, or click it to drop it in an open spot. Front of the room = closest to where you stand (the teacher icon), or to the whiteboard or screen if there's no teacher icon.");
     side.appendChild(el("div", "seatSideH", "Start over"));
     side.appendChild(btn("Clear the whole room", "warn full", function(){
       showConfirm("Remove every desk, table and room item? Students stay on your lists but lose their seats.", function(ok){
