@@ -6990,7 +6990,7 @@ function buildSeatBody(w){
   var askB = document.createElement("button");
   askB.className = "seatWinBtn ask"; askB.textContent = "❓ Ask"; askB.title = "Ask a question: spin to call on a student";
   var saveB = document.createElement("button");
-  saveB.className = "seatWinBtn alt"; saveB.textContent = "💾"; saveB.title = "Save or load the seating charts as a file";
+  saveB.className = "seatWinBtn alt"; saveB.textContent = "💾"; saveB.title = "Save or load the seating charts and bell schedules as a file";
   bar.appendChild(sel); bar.appendChild(askB); bar.appendChild(editB); bar.appendChild(printB); bar.appendChild(saveB);
   wrap.appendChild(bar);
   var nag = document.createElement("div");
@@ -7047,7 +7047,7 @@ function buildSeatBody(w){
 /* ---------- save file: the seating charts as a text (.json) file on the computer ---------- */
 var SEAT_SAVE_DAYS = 7;   // remind after this many days with unsaved changes
 function seatHash(){
-  var s = JSON.stringify(seatState()), h = 5381;
+  var s = JSON.stringify(seatState()) + JSON.stringify(seatBells()), h = 5381;
   for (var i=0;i<s.length;i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return String(h);
 }
@@ -7065,14 +7065,19 @@ function seatNeedsSave(){
   return Date.now() - Math.max(info.at || 0, info.dirtyAt) >= SEAT_SAVE_DAYS * 86400000;
 }
 function seatMarkSaved(){ var info = seatSaveInfo(); info.at = Date.now(); info.hash = seatHash(); delete info.dirtyAt; saveState(); }
-function seatSaveText(){
-  return JSON.stringify({ app: "teacherbase-seating", version: 1, savedAt: new Date().toISOString(), seating: seatState() }, null, 2);
+// the bell schedules ride along: the seating chart's periods are the bell schedule's periods
+function seatBells(){
+  return { schedules: state.bellSchedules, days: state.bellScheduleAssignments, dates: state.scheduleDateOverrides };
 }
+function seatSaveText(){
+  return JSON.stringify({ app: "teacherbase-seating", version: 2, savedAt: new Date().toISOString(), seating: seatState(), bells: seatBells() }, null, 2);
+}
+function seatSuggestedName(){ return "seating-and-bells-" + todayKey() + ".json"; }
 function seatDownload(){
   var blob = new Blob([seatSaveText()], { type: "application/json" });
   var a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "seating-" + todayKey() + ".json";
+  a.download = seatSuggestedName();
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
   seatMarkSaved();
@@ -7086,9 +7091,11 @@ function seatIdb(mode, fn){
     rq.onupgradeneeded = function(){ rq.result.createObjectStore("handles"); };
     rq.onerror = function(){ rej(rq.error); };
     rq.onsuccess = function(){
-      var tx = rq.result.transaction("handles", mode), r = fn(tx.objectStore("handles"));
-      tx.oncomplete = function(){ res(r && r.result); };
-      tx.onerror = function(){ rej(tx.error); };
+      try {
+        var tx = rq.result.transaction("handles", mode), r = fn(tx.objectStore("handles"));
+        tx.oncomplete = function(){ res(r && r.result); };
+        tx.onerror = function(){ rej(tx.error); };
+      } catch(e){ rej(e); }   // e.g. a file this browser can't remember: the save still goes ahead
     };
   });
 }
@@ -7100,7 +7107,12 @@ function seatSaveToFile(pickNew){
   return (pickNew ? Promise.resolve(null) : seatGetHandle()).then(function(h){
     if (h) return h.queryPermission({ mode: "readwrite" }).then(function(p){ return p === "granted" ? p : h.requestPermission({ mode: "readwrite" }); })
       .then(function(p){ if (p !== "granted") throw new Error("Permission to save to " + h.name + " was not given."); return h; });
-    return window.showSaveFilePicker({ suggestedName: "seating-chart.json", types: [{ description: "Seating chart save file", accept: { "application/json": [".json"] } }] })
+    // Save as: you pick the name and the folder (it opens in the folder of the last save)
+    var opts = { suggestedName: seatSuggestedName(), types: [{ description: "Seating chart and bell schedule save file", accept: { "application/json": [".json"] } }] };
+    return (seatFileHandle ? Promise.resolve(seatFileHandle) : seatGetHandle()).then(function(last){
+      if (last) opts.startIn = last;
+      return window.showSaveFilePicker(opts).catch(function(e){ if (e && e.name === "AbortError") throw e; delete opts.startIn; return window.showSaveFilePicker(opts); });
+    })
       .then(function(nh){ seatFileHandle = nh; return seatIdb("readwrite", function(s){ return s.put(nh, "seating"); }).then(function(){ return nh; }, function(){ return nh; }); });
   }).then(function(h){
     return h.createWritable().then(function(w){ return w.write(seatSaveText()).then(function(){ return w.close(); }); }).then(function(){ seatMarkSaved(); return h.name; });
@@ -7110,7 +7122,17 @@ function seatSaveToFile(pickNew){
 function seatReadSave(text){
   var d = JSON.parse(text), s = d && d.seating;
   if (!s || !Array.isArray(s.items) || !s.periods || typeof s.periods !== "object") throw new Error("not a seating file");
-  return s;
+  // older seating saves have no bell schedules; a whole teacherbase export keeps them at the top
+  var b = d.bells || (d.bellSchedules ? { schedules: d.bellSchedules, days: d.bellScheduleAssignments, dates: d.scheduleDateOverrides } : null);
+  if (b && (!b.schedules || typeof b.schedules !== "object" || !Object.keys(b.schedules).length)) b = null;
+  return { seating: s, bells: b };
+}
+function seatLoadBells(b){
+  var copy = JSON.parse(JSON.stringify(b));
+  state.bellSchedules = copy.schedules;
+  if (copy.days && typeof copy.days === "object") state.bellScheduleAssignments = copy.days;
+  state.scheduleDateOverrides = copy.dates && typeof copy.dates === "object" ? copy.dates : {};
+  saveState();
 }
 function seatLoad(fileSeat, periods, withRoom){
   var ss = seatState(), copy = JSON.parse(JSON.stringify(fileSeat));
@@ -7137,19 +7159,21 @@ function seatFileDialog(){
   function main(msg, bad){
     var info = seatSaveInfo();
     card.innerHTML =
-      '<h3>💾 Save or load seating charts</h3>' +
-      '<p class="seatDlgNote">Saves the room, tags, and every period\'s students and seats in a text file (.json) on this computer, so nothing is lost if this browser is cleared. ' +
+      '<h3>💾 Save or load seating charts and bell schedules</h3>' +
+      '<p class="seatDlgNote">Saves the room, tags, every period\'s students and seats, and your bell schedules (with the weekday choices and special dates) in one text file (.json) on this computer, so nothing is lost if this browser is cleared. ' +
       (info.at ? "Last saved " + new Date(info.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) + "." : "Not saved yet.") + '</p>' +
       '<div class="seatDlgH">Save</div>' +
-      '<button class="seatBtn go full" data-a="dl">⬇ Download a save file (seating-' + todayKey() + '.json)</button>' +
-      (canFile ? '<button class="seatBtn full" data-a="file">💾 Save to my file</button><button class="seatBtn full" data-a="newfile">Choose a different file…</button>' +
-        '<div class="seatDlgNote">Save to my file: pick a file once, and later saves write over that same file.</div>'
-        : '<div class="seatDlgNote">Saving over the same file each time works in Chrome or Edge.</div>') +
+      (canFile ? '<button class="seatBtn go full" data-a="file">💾 Save</button>' +
+        '<button class="seatBtn full" data-a="newfile">📁 Save as… (choose the name and folder)</button>' +
+        '<div class="seatDlgNote">Save writes over the file you saved last time. Save as lets you name a new file and pick its folder.</div>' +
+        '<button class="seatBtn full" data-a="dl">⬇ Download a copy to Downloads</button>'
+        : '<button class="seatBtn go full" data-a="dl">⬇ Download a save file (' + seatSuggestedName() + ')</button>' +
+          '<div class="seatDlgNote">Choosing the file name and folder works in Edge or Chrome. This browser puts the file in Downloads.</div>') +
       '<div class="seatDlgH">Load</div>' +
       '<button class="seatBtn full" data-a="load">📂 Load from a save file…</button>' +
       '<div class="seatDlgMsg' + (bad ? " bad" : "") + '">' + (msg ? escapeHtml(msg) : "") + '</div>' +
       '<div class="seatDlgBtns"><button class="seatBtn" data-a="close">Close</button></div>';
-    if (canFile) seatGetHandle().then(function(h){ var b = card.querySelector('[data-a="file"]'); if (h && b) b.textContent = "💾 Save to " + h.name; });
+    if (canFile) seatGetHandle().then(function(h){ var b = card.querySelector('[data-a="file"]'); if (b) b.textContent = h ? "💾 Save (to " + h.name + ")" : "💾 Save (choose the name and folder)"; });
     card.querySelector('[data-a="dl"]').onclick = function(){ seatDownload(); main("Downloaded. It's in your Downloads folder."); };
     if (canFile){
       card.querySelector('[data-a="file"]').onclick = function(){ save(false); };
@@ -7170,16 +7194,19 @@ function seatFileDialog(){
       if (!f) return;
       f.text().then(function(t){
         var s;
-        try { s = seatReadSave(t); } catch(e){ main("That file isn't a seating chart save file.", true); return; }
+        try { s = seatReadSave(t); } catch(e){ main("That file isn't a seating chart and bell schedule save file.", true); return; }
         choose(s, f.name);
       });
     };
     inp.click();
   }
-  function choose(s, fname){
+  function choose(file, fname){
+    var s = file.seating, bells = file.bells;
     var names = Object.keys(s.periods).filter(function(k){ return s.periods[k] && Array.isArray(s.periods[k].students) && s.periods[k].students.length; });
     var html = '<h3>📂 Load from ' + escapeHtml(fname) + '</h3>' +
-      '<p class="seatDlgNote">Tick what to load. Each period you tick replaces that period here. Periods you don\'t tick stay as they are.</p>' +
+      '<p class="seatDlgNote">Tick what to load. Each thing you tick replaces it here. Anything you don\'t tick stays as it is.</p>' +
+      (bells ? '<label class="seatCheck"><input type="checkbox" data-bells checked> Bell schedules <span class="seatDlgNote">(' + Object.keys(bells.schedules).length + ' schedules, weekday choices, special dates)</span></label>'
+        : '<div class="seatDlgNote">This file has no bell schedules (it was saved before they were included).</div>') +
       '<label class="seatCheck"><input type="checkbox" data-room checked> Room layout and tags</label>';
     if (!names.length) html += '<div class="seatDlgNote">No periods with students in this file.</div>';
     names.forEach(function(k){
@@ -7192,15 +7219,17 @@ function seatFileDialog(){
       var ss = seatState(), copy = JSON.parse(JSON.stringify(s));
       ss.items = copy.items; if (Array.isArray(copy.tags)) ss.tags = copy.tags; ss.periods = copy.periods;
       for (var k in ss.periods) seatSanitize(ss.periods[k]);
+      if (bells) seatLoadBells(bells);
       seatMarkSaved();
       main("Loaded everything from " + fname + ".");
     };
     card.querySelector('[data-a="some"]').onclick = function(){
       var pers = [].map.call(card.querySelectorAll("[data-per]:checked"), function(cb){ return cb.getAttribute("data-per"); });
-      var room = card.querySelector("[data-room]").checked;
-      if (!pers.length && !room) return;
-      seatLoad(s, pers, room);
-      main("Loaded " + [room ? "the room layout and tags" : ""].concat(pers).filter(Boolean).join(", ") + ".");
+      var room = card.querySelector("[data-room]").checked, bellCb = card.querySelector("[data-bells]"), withBells = !!(bellCb && bellCb.checked);
+      if (!pers.length && !room && !withBells) return;
+      if (withBells) seatLoadBells(bells);
+      if (pers.length || room) seatLoad(s, pers, room);
+      main("Loaded " + [withBells ? "the bell schedules" : "", room ? "the room layout and tags" : ""].concat(pers).filter(Boolean).join(", ") + ".");
     };
   }
   main();
