@@ -6233,7 +6233,7 @@ function critInit(){ critApply("spider"); critApply("chameleon"); }
 
 /* ============================================================
 FRIDAY VIDEO — on Fridays with a class schedule, a big window pops up
-for the last 4 minutes of each class period and plays the video from the
+for the last 4 minutes of each period (lunch too) and plays the video from the
 start. The toggle turns it off for the rest of the day. At the bell it
 goes back to the dock.
 ============================================================ */
@@ -6245,7 +6245,7 @@ function fvState(){
 }
 function fvOn(){ return fvState().offDay !== todayKey(); }
 function fvWin(){ for (var i=0;i<state.windows.length;i++) if (state.windows[i].type === "fridayvid") return state.windows[i]; return null; }
-// the class period whose last 4 minutes it is right now (Fridays with a class schedule), or null
+// the period (lunch too) whose last 4 minutes it is right now (Fridays with a class schedule), or null
 function fvSlot(){
   var d = new Date();
   if (d.getDay() !== 5) return null;
@@ -6254,7 +6254,6 @@ function fvSlot(){
   var mins = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
   for (var i=0;i<sched.periods.length;i++){
     var p = sched.periods[i];
-    if (/lunch/i.test(p.label)) continue;
     if (mins >= p.end - FV_MINUTES && mins < p.end) return p;
   }
   return null;
@@ -6323,7 +6322,7 @@ function buildFridayBody(w){
     var on = fvOn();
     toggle.className = "fvToggle" + (on ? " on" : "");
     toggle.innerHTML = '<span class="fvKnob"></span>' + (on ? "Fridays: ON" : "Off for today");
-    note.textContent = on ? "Plays by itself for the last " + FV_MINUTES + " minutes of each class period on Fridays." :
+    note.textContent = on ? "Plays by itself for the last " + FV_MINUTES + " minutes of each period (lunch too) on Fridays." :
       "Off for the rest of today. It comes back on by itself next Friday.";
   }
   toggle.onclick = function(){ fs.offDay = fvOn() ? todayKey() : null; saveState(); showToggle(); };
