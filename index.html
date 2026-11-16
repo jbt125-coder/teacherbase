@@ -729,6 +729,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
 #critters { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; z-index: 0; pointer-events: none; }
 #critTop { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .critBox { position: absolute; overflow: visible; }
+.critBox.falling { transition: transform 1.7s cubic-bezier(.5,0,.9,.55), opacity 1.7s ease-in; opacity: .6; }
 .critWeb { position: absolute; left: 0; top: 0; overflow: visible; transition: opacity 5s; }
 .critWeb line { stroke: rgba(235,238,242,.75); stroke-width: .9; stroke-linecap: round; }
 .critWeb line.sticky { stroke: rgba(235,238,242,.6); stroke-width: .7; }
@@ -5800,19 +5801,63 @@ function critLayer(){
   if (!crit.layer || !crit.layer.isConnected){ crit.layer = document.createElement("div"); crit.layer.id = "critters"; canvas.appendChild(crit.layer); }
   return crit.layer;
 }
-// a w×h patch of board in view that no window covers
-function critFreeSpot(w, h){
-  var vx = canvas.scrollLeft, vy = canvas.scrollTop, vw = canvas.clientWidth, vh = canvas.clientHeight;
-  if (vw < w + 20 || vh < h + 20) return null;
-  var rects = state.windows.filter(function(win){ return !win.closed && !win.sentAway && !isPoppedOut(win) && win.type !== "pointer"; })
-    .map(function(win){ return { x: win.x - 12, y: win.y - 12, w: win.w + 24, h: win.h + 24 }; });
-  // and out of each other's way
-  if (crit.spider) rects.push({ x: parseFloat(crit.spider.box.style.left) - 20, y: parseFloat(crit.spider.box.style.top) - 20, w: 280, h: 280 });
-  for (var t=0;t<150;t++){
-    var x = vx + 10 + Math.random() * (vw - w - 20), y = vy + 10 + Math.random() * (vh - h - 20);
-    if (!rects.some(function(r){ return x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y; })) return { x: x, y: y };
+// the open windows (on the board, in board coordinates, read from the page so they're exact)
+function critWindowRects(){
+  var out = [];
+  state.windows.forEach(function(w){
+    if (w.closed || w.sentAway || isPoppedOut(w) || w.type === "pointer") return;
+    var el = document.getElementById("winel_" + w.id);
+    if (el) out.push({ id: w.id, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+  });
+  return out;
+}
+// how far a thread from (px, py) going (dx, dy) reaches before it hits a window or the edge of the screen
+function critRay(px, py, dx, dy, rects, V){
+  var best = Infinity, hit = "edge";
+  if (dx > 0) best = Math.min(best, (V.x + V.w - px) / dx); else if (dx < 0) best = Math.min(best, (V.x - px) / dx);
+  if (dy > 0) best = Math.min(best, (V.y + V.h - py) / dy); else if (dy < 0) best = Math.min(best, (V.y - py) / dy);
+  rects.forEach(function(r){
+    var t0 = -Infinity, t1 = Infinity;
+    [[px, dx, r.x, r.x + r.w], [py, dy, r.y, r.y + r.h]].forEach(function(a){
+      if (a[1] === 0){ if (a[0] < a[2] || a[0] > a[3]){ t0 = Infinity; } return; }
+      var ta = (a[2] - a[0]) / a[1], tb = (a[3] - a[0]) / a[1];
+      t0 = Math.max(t0, Math.min(ta, tb)); t1 = Math.min(t1, Math.max(ta, tb));
+    });
+    if (t0 <= t1 && t0 > 0 && t0 < best){ best = t0; hit = r.id; }
+  });
+  return { d: best, hit: hit };
+}
+var WEB_MIN = 55, WEB_MAX = 290;
+// a gap where the web can hang from the edge of the screen and stick to open windows:
+// threads in most directions reach a window or the screen's edge within WEB_MAX
+function spiderGap(){
+  var V = { x: canvas.scrollLeft, y: canvas.scrollTop, w: canvas.clientWidth, h: canvas.clientHeight };
+  var rects = critWindowRects(), best = null;
+  if (!rects.length) return null;
+  for (var t=0;t<300;t++){
+    var px = V.x + 30 + Math.random() * (V.w - 60), py = V.y + 30 + Math.random() * (V.h - 60);
+    if (rects.some(function(r){ return px > r.x - 35 && px < r.x + r.w + 35 && py > r.y - 35 && py < r.y + r.h + 35; })) continue;
+    var spokes = [], edge = false, win = false, N = 12, off = Math.random();
+    for (var i=0;i<N;i++){
+      var a = (i + off + critRand(-0.15, 0.15)) / N * Math.PI * 2, r = critRay(px, py, Math.cos(a), Math.sin(a), rects, V);
+      if (r.d < WEB_MIN || r.d > WEB_MAX) continue;
+      spokes.push({ a: a, d: r.d, hit: r.hit });
+      if (r.hit === "edge") edge = true; else win = true;
+    }
+    if (spokes.length < 6 || !edge || !win) continue;
+    // the spokes have to go all the way around, or the web has nothing to hold it on one side
+    var gap = 0;
+    for (var k=0;k<spokes.length;k++){
+      var next = k + 1 < spokes.length ? spokes[k+1].a : spokes[0].a + Math.PI * 2;
+      gap = Math.max(gap, next - spokes[k].a);
+    }
+    if (gap > Math.PI * 0.62) continue;
+    // more spokes, no big open side, and roomier gaps (a bigger web) score higher
+    var avg = spokes.reduce(function(t2, s2){ return t2 + s2.d; }, 0) / spokes.length;
+    var score = spokes.length - gap * 2 + avg / 60;
+    if (!best || score > best.score) best = { x: px, y: py, spokes: spokes, score: score, V: V };
   }
-  return null;
+  return best;
 }
 function critLater(kind, fn, ms){ clearTimeout(crit.wait[kind]); crit.wait[kind] = setTimeout(fn, critWait(ms)); }
 // a thing that walks: moves its centre to (x, y) at speed px/s, facing where it goes; calls done when there
@@ -5866,21 +5911,32 @@ var COCOON_SVG = '<svg viewBox="0 0 20 20" width="100%" height="100%"><ellipse c
 
 function spiderStart(){
   if (!critOn("spider") || crit.spider) return;
-  var S = 240, spot = critFreeSpot(S, S);
-  if (!spot){ critLater("spider", spiderStart, 60000); return; }
+  var gap = spiderGap();
+  if (!gap){ critLater("spider", spiderStart, 60000); return; }
+  var c = WEB_MAX + 20, S = c * 2, bx = gap.x - c, by = gap.y - c;
   var box = document.createElement("div");
   box.className = "critBox";
-  box.style.cssText = "left:" + spot.x + "px;top:" + spot.y + "px;width:" + S + "px;height:" + S + "px;";
+  box.style.cssText = "left:" + bx + "px;top:" + by + "px;width:" + S + "px;height:" + S + "px;";
   box.innerHTML = '<svg class="critWeb" width="' + S + '" height="' + S + '" viewBox="0 0 ' + S + ' ' + S + '"></svg>';
   critLayer().appendChild(box);
   var web = box.querySelector(".critWeb");
   var spEl = critSvg(SPIDER_SVG, 54, 54, "critSpider");
   box.appendChild(spEl);
   spEl.style.pointerEvents = "auto";
-  var c = S / 2, sp = critMover(spEl, c, -40, 180);
-  var me = crit.spider = { box: box, sp: sp, el: spEl, t: null, gone: false, web: web, spiral: [] };
-  spEl.title = "";
+  // it drops down on a thread from the top of the screen
+  var sp = critMover(spEl, c, gap.V.y - by - 40, 180);
+  var me = crit.spider = { box: box, sp: sp, el: spEl, t: null, gone: false, web: web, spiral: [], c: c, held: {} };
   spEl.addEventListener("click", function(){ spiderLeave(); });
+  // the windows it's stuck to, and the screen's size: if any of them change, the web falls
+  critWindowRects().forEach(function(r){ if (gap.spokes.some(function(s2){ return s2.hit === r.id; })) me.held[r.id] = r.x + "," + r.y + "," + r.w + "," + r.h; });
+  me.screen = canvas.clientWidth + "x" + canvas.clientHeight;
+  me.watch = setInterval(function(){
+    if (me.gone) return;
+    var now = {};
+    critWindowRects().forEach(function(r){ now[r.id] = r.x + "," + r.y + "," + r.w + "," + r.h; });
+    for (var id in me.held) if (now[id] !== me.held[id]){ spiderFall(); return; }
+    if (canvas.clientWidth + "x" + canvas.clientHeight !== me.screen) spiderFall();
+  }, 400);
 
   function line(x1, y1, x2, y2, ms, cls){
     var l = document.createElementNS("http://www.w3.org/2000/svg", "line"), len = Math.sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
@@ -5893,34 +5949,46 @@ function spiderStart(){
     l.style.strokeDashoffset = 0;
     return l;
   }
-  // the web: a drop line, spokes out from the middle, a frame around them, then the sticky spiral from the outside in
-  var N = 9 + Math.floor(Math.random() * 3), anchors = [];
-  for (var i=0;i<N;i++){
-    var a = (i + critRand(-0.18, 0.18)) / N * Math.PI * 2, R = critRand(96, 112);
-    anchors.push({ x: c + Math.cos(a) * R, y: c + Math.sin(a) * R, a: a, R: R });
-  }
+  web.style.overflow = "visible";
+  // the web: the drop line, spokes glued to the windows and the screen's edge, a frame, then the sticky spiral from the outside in
+  var anchors = gap.spokes.map(function(s2){ return { x: c + Math.cos(s2.a) * s2.d, y: c + Math.sin(s2.a) * s2.d }; }), N = anchors.length;
   var steps = [];   // each: [x, y, speed, drawThread]
-  steps.push([c, c, 60, true]);
-  anchors.forEach(function(p){ steps.push([p.x, p.y, 70, true]); steps.push([c, c, 110, false]); });
-  steps.push([anchors[0].x, anchors[0].y, 110, false]);
-  for (var f=1;f<=N;f++){ var q = anchors[f % N]; steps.push([q.x, q.y, 80, true]); }
-  var rOut = 0.86, rIn = 0.14, turns = 8, total = turns * N;
+  steps.push([c, c, 70, true]);
+  anchors.forEach(function(p){ steps.push([p.x, p.y, 75, true]); steps.push([c, c, 115, false]); });
+  // the frame runs a little inside the anchors, so it hangs in the gap instead of along the windows
+  var frame = anchors.map(function(p){ return { x: c + (p.x - c) * 0.93, y: c + (p.y - c) * 0.93 }; });
+  steps.push([frame[0].x, frame[0].y, 115, false]);
+  for (var f=1;f<=N;f++){ var q = frame[f % N]; steps.push([q.x, q.y, 85, true]); }
+  var rOut = 0.84, rIn = 0.14, turns = 8, total = turns * N;
   for (var j=0;j<=total;j++){
     var p2 = anchors[j % N], frac = rOut - (rOut - rIn) * j / total;
     var pt = { x: c + (p2.x - c) * frac, y: c + (p2.y - c) * frac };
     me.spiral.push(pt);
-    steps.push([pt.x, pt.y, 75, j > 0]);
+    steps.push([pt.x, pt.y, 80, j > 0]);
   }
   steps.push([c, c, 60, false]);
-  var k = 0;
+  var k = 0, sticky = 2 * N + 2 + N;
   spEl.classList.add("walking");
   (function next(){
     if (me.gone) return;
     if (k >= steps.length){ spEl.classList.remove("walking"); spiderWaitFly(); return; }
     var st = steps[k++], x0 = sp.x, y0 = sp.y;
     var ms = sp.go(st[0], st[1], st[2], next);
-    if (st[3]) line(x0, y0, st[0], st[1], ms, k > 2 * N + 2 + N ? "sticky" : "");
+    if (st[3]) line(x0, y0, st[0], st[1], ms, k > sticky ? "sticky" : (k === 1 ? "drop" : ""));
   })();
+}
+// a window it was stuck to moved (or the screen changed size): the web and the spider fall off the bottom;
+// it drops back in from the top about 5 minutes later and tries again somewhere else
+function spiderFall(){
+  var me = crit.spider;
+  if (!me || me.gone) return;
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.sp.t); clearInterval(me.watch);
+  crit.spider = null;
+  var drop = canvas.scrollTop + canvas.clientHeight - parseFloat(me.box.style.top) + 80;
+  me.box.classList.add("falling");
+  me.box.style.transform = "translateY(" + drop + "px) rotate(" + critRand(-14, 14) + "deg)";
+  setTimeout(function(){ me.box.remove(); }, 2000);
+  critLater("spider", spiderStart, 5 * 60000);
 }
 function spiderWaitFly(){
   var me = crit.spider;
@@ -5930,7 +5998,7 @@ function spiderWaitFly(){
 function spiderFly(){
   var me = crit.spider;
   if (!me || me.gone) return;
-  var c = 120, land = me.spiral[Math.floor(critRand(me.spiral.length * 0.15, me.spiral.length * 0.7))];
+  var c = me.c, land = me.spiral[Math.floor(critRand(me.spiral.length * 0.15, me.spiral.length * 0.7))];
   var flyEl = critSvg(FLY_SVG, 24, 24, "critFly flying");
   me.box.appendChild(flyEl);
   var a0 = Math.random() * Math.PI * 2, fly = critMover(flyEl, c + Math.cos(a0) * 420, c + Math.sin(a0) * 420, 0);
@@ -5971,7 +6039,7 @@ function spiderCatch(fly){
       fly.el.remove(); me.fly = null;
       me.el.classList.remove("wrapping"); me.el.classList.add("walking");
       // carry it to the middle and eat it
-      sp.go(120, 114, 50, function(){
+      sp.go(me.c, me.c - 6, 50, function(){
         if (me.gone) return;
         me.el.classList.remove("walking"); me.el.classList.add("wrapping");
         coc.firstChild.classList.add("eaten");
@@ -5982,7 +6050,7 @@ function spiderCatch(fly){
           spiderWaitFly();
         }, 6500);
       });
-      cm.go(120, 122, 50);
+      cm.go(me.c, me.c + 2, 50);
     }, 4000);
   });
 }
@@ -5990,7 +6058,7 @@ function spiderCatch(fly){
 function spiderLeave(){
   var me = crit.spider;
   if (!me || me.gone) return;
-  me.gone = true; clearTimeout(me.t); clearTimeout(me.sp.t);
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.sp.t); clearInterval(me.watch);
   var top = canvas.scrollTop - parseFloat(me.box.style.top) - 60;
   var l = document.createElementNS("http://www.w3.org/2000/svg", "line");
   l.setAttribute("x1", me.sp.x); l.setAttribute("y1", me.sp.y); l.setAttribute("x2", me.sp.x); l.setAttribute("y2", top);
@@ -6008,7 +6076,7 @@ function spiderRemove(){
   var me = crit.spider;
   clearTimeout(crit.wait.spider);
   if (!me) return;
-  me.gone = true; clearTimeout(me.t); me.box.remove(); crit.spider = null;
+  me.gone = true; clearTimeout(me.t); clearInterval(me.watch); me.box.remove(); crit.spider = null;
 }
 
 /* ---------- the chameleon ---------- */
