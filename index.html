@@ -970,6 +970,15 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
         }
         dock.appendChild(chip);
       }
+      if (isPoppedOut(w) && !w.closed){
+        anySent = true;
+        var chip3 = document.createElement("div");
+        chip3.className = "dockChip";
+        chip3.title = "Click to bring it back to the board";
+        chip3.innerHTML = '<span>&#8663;</span><span>' + escapeHtml(w.title) + ' (popped out)</span>';
+        (function(win){ chip3.onclick = function(){ bringBackPopout(win); }; })(w);
+        dock.appendChild(chip3);
+      }
       if (w.sentAway && !w.closed){
         anySent = true;
         var gt = document.createElement("div");
@@ -1009,7 +1018,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
   }
 
   function renderWindow(w){
-    if (w.closed || w.sentAway || arcadeHiddenWinId === w.id) return;
+    if (w.closed || w.sentAway || arcadeHiddenWinId === w.id || isPoppedOut(w)) return;
     if (w.type === "pointer"){ renderPointer(w); return; }
 
     var el = document.createElement("div");
@@ -1426,75 +1435,55 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     document.addEventListener("touchend", pointerUp);
   }
 
-  /* ---------- Pop out to real separate window ---------- */
+  /* ---------- Pop out to a real separate window ---------- */
+  // The window moves into its own browser window (for a second screen or projector), built by the
+  // same code as on the board. It leaves the board while it's out and comes back when that window closes.
+  var popouts = {};   // window id -> the browser window it's in
+  function isPoppedOut(w){ var pw = popouts[w.id]; return !!(pw && !pw.closed); }
+  function bringBackPopout(w){ var pw = popouts[w.id]; delete popouts[w.id]; if (pw && !pw.closed) pw.close(); renderAll(); }
+  window.addEventListener("beforeunload", function(){
+    for (var id in popouts){ try { popouts[id].close(); } catch(e){} }
+  });
   function popOutWindow(w){
+    if (w.type === "arcade" || w.type === "annotation" || w.type === "pointer"){
+      alert("The " + w.title + " works on the board itself, so it can't pop out to its own window.");
+      return;
+    }
+    if (isPoppedOut(w)){ popouts[w.id].focus(); return; }
     var popup = window.open("", "popout_"+w.id, "width="+Math.max(w.w,320)+",height="+Math.max(w.h,240)+",menubar=no,toolbar=no,location=no,status=no");
     if (!popup){
       alert("Pop-up blocked. Please allow pop-ups for this page to use the second-screen window.");
       return;
     }
+    if (w.type === "seatchart") seatCss(document);
     var themeObj = THEMES[state.theme] || THEMES.slate;
+    // the board's own styles, so the window looks and works the same
+    var styles = [].map.call(document.querySelectorAll("style"), function(st){ return st.outerHTML; }).join("");
+    popup.document.open();
     popup.document.write(
-      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>" + escapeHtml(w.title) + "</title>" +
-      "<style>body{margin:0;background:"+themeObj.win+";font-family:-apple-system,sans-serif;color:#24303f;} " +
-      ".hdr{background:#e7e2d6;padding:10px 14px;font-weight:700;font-size:14px;border-bottom:1px solid #dcd6c6;} " +
-      ".content{padding:16px;font-size:15px;line-height:1.5;white-space:pre-wrap;}" +
-      "textarea{width:100%;height:80vh;border:none;padding:14px;font-size:16px;font-family:inherit;box-sizing:border-box;}</style></head><body>" +
-
-  "<div class='hdr'>" + escapeHtml(w.title) + " &mdash; drag this window to your second monitor</div>" +
-  "<div class='content' id='c'></div>" +
-  "</body></html>"
-);
-popup.document.close();
-
-var target = popup.document.getElementById("c");
-if (w.type === "bellwork"){
-  var ed = popup.document.createElement("div");
-  ed.contentEditable = "true";
-  ed.style.cssText = "width:100%;height:80vh;padding:14px;font-size:16px;line-height:1.5;outline:none;overflow:auto;box-sizing:border-box;";
-  var raw = w.content || "";
-  var looksHtml = /<[a-z][\s\S]*>/i.test(raw);
-  ed.innerHTML = looksHtml ? raw : escapeHtml(raw).replace(/\n/g, "<br>");
-  ed.oninput = function(){ w.content = ed.innerHTML; saveState(); };
-  target.appendChild(ed);
-} else if (w.type === "answers"){
-  var refresh = function(){
-    target.innerHTML = "";
-    if (!w.feed || !w.feed.length){
-      target.innerHTML = "<div style='color:#9a9282;'>No answers submitted yet.</div>";
-      return;
+      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>" + escapeHtml(w.title) + "</title>" + styles +
+      "<style>html,body{margin:0;height:100%;overflow:hidden;background:" + themeObj.win + ";}" +
+      ".win.popWin{position:fixed !important;inset:0;left:0 !important;top:0 !important;width:auto !important;height:auto !important;border-radius:0;box-shadow:none;}" +
+      // the color and table pickers open on the main board, so they're hidden out here
+      ".popWin .richColorSplit,.popWin .richBtnWide{display:none !important;}" +
+      // a popped-out clock fills its window, for a projector or second screen
+      ".popWin .clockTime{font-size:19vmin !important;}.popWin .clockDate{font-size:7vmin !important;}.popWin .clockPer{font-size:6vmin !important;}</style>" +
+      "</head><body class='" + document.body.className + "'><div class='win popWin'><div class='winBody' id='c'></div></div></body></html>"
+    );
+    popup.document.close();
+    var target = popup.document.getElementById("c");
+    target.appendChild(buildBody(w));
+    popouts[w.id] = popup;
+    renderAll();
+    var gone = false;
+    function back(){
+      if (gone) return;
+      gone = true; clearInterval(watch);
+      if (popouts[w.id] === popup){ delete popouts[w.id]; renderAll(); }
     }
-    for (var i=w.feed.length-1;i>=0;i--){
-      var it = w.feed[i];
-      var d = popup.document.createElement("div");
-      d.style.cssText = "background:#fff;border:1px solid #e2ddcf;border-radius:8px;padding:8px 10px;margin-bottom:8px;";
-      d.innerHTML = "<b style='color:#1f8f7d;'>" + escapeHtml(it.name) + "</b><div>" + escapeHtml(it.text) + "</div>";
-      target.appendChild(d);
-    }
-  };
-  refresh();
-  var iv = setInterval(function(){
-    if (popup.closed){ clearInterval(iv); return; }
-    refresh();
-  }, 1500);
-} else if (w.type === "seatchart"){
-  seatCss(popup.document);
-  target.style.cssText = "position:relative;height:calc(100vh - 60px);padding:0;white-space:normal;";
-  var seatHost = popup.document.createElement("div");
-  seatHost.className = "seatFitHost";
-  seatHost.style.cssText = "position:absolute;inset:10px;";
-  target.appendChild(seatHost);
-  var seatO = { period: seatShownPeriod(w), mode: "view", showTags: false };
-  var seatApi = seatMount(seatHost, seatO);
-  var seatIv = setInterval(function(){
-    if (popup.closed){ clearInterval(seatIv); return; }
-    seatO.period = seatShownPeriod(w); seatApi.draw();
-  }, 2000);
-} else {
-  target.textContent = "Live view of \"" + w.title + "\" — this content type doesn't pop out with full interactivity yet, but you can keep it visible here for your second screen.";
-}
-
-}
+    popup.addEventListener("pagehide", back);
+    var watch = setInterval(function(){ if (popup.closed) back(); }, 1000);
+  }
 
 /* ============================================================
 RICH TEXT EDITOR (bold/underline/size/color + image paste)
@@ -1527,7 +1516,7 @@ function linkifyPlainText(text){
 }
 
 function autoLinkifyAtCursor(editable, persist){
-  var sel = window.getSelection();
+  var sel = editable.ownerDocument.defaultView.getSelection();
   if (!sel.rangeCount) return;
   var range = sel.getRangeAt(0);
   if (!range.collapsed) return;
@@ -1558,7 +1547,7 @@ function autoLinkifyAtCursor(editable, persist){
   parent.insertBefore(inline, node);
   parent.insertBefore(afterNode, node);
   parent.removeChild(node);
-  var newRange = document.createRange();
+  var newRange = editable.ownerDocument.createRange();
   newRange.setStart(afterNode, 0);
   newRange.setEnd(afterNode, 0);
   sel.removeAllRanges();
@@ -1577,7 +1566,7 @@ function buildTableHtml(rows, cols){
   return html;
 }
 function getSelectedTable(editable){
-  var sel = window.getSelection();
+  var sel = editable.ownerDocument.defaultView.getSelection();
   if (!sel.rangeCount) return null;
   var node = sel.getRangeAt(0).startContainer;
   if (node.nodeType === 3) node = node.parentNode;
@@ -1690,7 +1679,7 @@ function wrapImageForResize(img){
 
 var ANIM_WORD_CLASSES = ["anim-bounce","anim-wiggle","anim-pulse","anim-shake","anim-rainbow","anim-glow"];
 function toggleAnimateSelection(editable){
-  var sel = window.getSelection();
+  var sel = editable.ownerDocument.defaultView.getSelection();
   if (!sel.rangeCount || sel.isCollapsed) return;
   var range = sel.getRangeAt(0);
 
@@ -1808,22 +1797,22 @@ editable.innerHTML = looksHtml ? raw : escapeHtml(raw).replace(/\n/g, "<br>");
 
 function persist(){ w[field] = editable.innerHTML; saveState(); }
 
-wrap.querySelector(".richBoldBtn").onclick = function(){ editable.focus(); document.execCommand("bold"); persist(); };
-wrap.querySelector(".richUnderlineBtn").onclick = function(){ editable.focus(); document.execCommand("underline"); persist(); };
+wrap.querySelector(".richBoldBtn").onclick = function(){ editable.focus(); editable.ownerDocument.execCommand("bold"); persist(); };
+wrap.querySelector(".richUnderlineBtn").onclick = function(){ editable.focus(); editable.ownerDocument.execCommand("underline"); persist(); };
 wrap.querySelector(".richAnimateBtn").onclick = function(){ editable.focus(); toggleAnimateSelection(editable); persist(); };
-wrap.querySelector(".richSizeSelect").onchange = function(e){ editable.focus(); document.execCommand("fontSize", false, e.target.value); persist(); };
+wrap.querySelector(".richSizeSelect").onchange = function(e){ editable.focus(); editable.ownerDocument.execCommand("fontSize", false, e.target.value); persist(); };
 var colorBar = wrap.querySelector(".richColorApply .bar");
 function refreshColorBar(){ colorBar.style.background = state.lastTextColor || DEFAULT_TEXT_COLOR; }
 refreshColorBar();
 var savedRange = null;
 function saveSelection(){
-  var sel = window.getSelection();
+  var sel = editable.ownerDocument.defaultView.getSelection();
   if (sel.rangeCount && editable.contains(sel.getRangeAt(0).commonAncestorContainer)) savedRange = sel.getRangeAt(0).cloneRange();
 }
 function applyTextColor(color){
   editable.focus();
-  if (savedRange){ var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); }
-  document.execCommand("foreColor", false, color);
+  if (savedRange){ var sel = editable.ownerDocument.defaultView.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); }
+  editable.ownerDocument.execCommand("foreColor", false, color);
   state.lastTextColor = color;
   refreshColorBar();
   persist();
@@ -1837,7 +1826,7 @@ wrap.querySelector(".richTableBtn").onclick = function(){
   showTablePrompt(function(res){
     if (!res) return;
     editable.focus();
-    document.execCommand("insertHTML", false, buildTableHtml(res.rows, res.cols));
+    editable.ownerDocument.execCommand("insertHTML", false, buildTableHtml(res.rows, res.cols));
     persist();
   });
 };
@@ -1916,7 +1905,7 @@ editable.addEventListener("paste", function(e){
         reader.onload = function(ev){
           downscalePastedImage(ev.target.result, function(finalDataUrl){
             editable.focus();
-            document.execCommand("insertHTML", false, '<img src="' + finalDataUrl + '">');
+            editable.ownerDocument.execCommand("insertHTML", false, '<img src="' + finalDataUrl + '">');
             persist();
           });
         };
@@ -1929,7 +1918,7 @@ editable.addEventListener("paste", function(e){
   if (text && /(https?:\/\/|www\.)/i.test(text)){
     e.preventDefault();
     editable.focus();
-    document.execCommand("insertHTML", false, linkifyPlainText(text));
+    editable.ownerDocument.execCommand("insertHTML", false, linkifyPlainText(text));
     persist();
     return;
   }
@@ -3438,10 +3427,13 @@ if (w.type === "clock"){
 var wrap2 = document.createElement("div");
 wrap2.style.cssText = "height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;";
 var d = document.createElement("div");
+d.className = "clockTime";
 d.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(28px,10vmin,52px);font-weight:700;color:#1d3d3a;";
 var dateEl = document.createElement("div");
+dateEl.className = "clockDate";
 dateEl.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(13px,4vmin,20px);font-weight:600;color:#5c6b68;";
 var periodEl = document.createElement("div");
+periodEl.className = "clockPer";
 periodEl.style.cssText = "font-family:'SF Mono',Menlo,monospace;font-size:clamp(12px,3.4vmin,17px);font-weight:700;color:#1f8f7d;";
 wrap2.appendChild(d);
 wrap2.appendChild(dateEl);
@@ -7040,7 +7032,7 @@ function buildSeatBody(w){
   editB.onclick = function(){ seatOpenEditor(seatShownPeriod(w)); };
   empty.onclick = editB.onclick;
   printB.onclick = function(){ seatPrintDialog(seatShownPeriod(w)); };
-  askB.onclick = function(){ seatAskQuestion(seatShownPeriod(w)); };
+  askB.onclick = function(){ seatAskQuestion(seatShownPeriod(w), wrap.ownerDocument); };
   saveB.onclick = seatFileDialog;
   updNag();
   var iv = setInterval(function(){
@@ -7290,10 +7282,11 @@ function seatSound(kind){
   else if (kind === "soft") note(440, 0, 0.25, "sine", 0.15);
 }
 
-function seatAskQuestion(period){
-  seatCss(document);
+function seatAskQuestion(period, doc){
+  doc = doc || document;   // a popped-out seating chart spins in its own window
+  seatCss(doc);
   var per = seatPer(period);
-  var ov = document.createElement("div");
+  var ov = doc.createElement("div");
   ov.className = "seatAsk";
   ov.tabIndex = -1;
   ov.innerHTML =
@@ -7307,7 +7300,7 @@ function seatAskQuestion(period){
       '<div class="seatAskName"></div>' +
       '<div class="seatAskBtns"></div>' +
     '</div>';
-  document.body.appendChild(ov);
+  doc.body.appendChild(ov);
   ov.focus();
   var host = ov.querySelector(".seatAskHost"), arrows = ov.querySelector(".seatAskArrows"), side = ov.querySelector(".seatAskSide");
   var nameEl = ov.querySelector(".seatAskName"), btns = ov.querySelector(".seatAskBtns");
@@ -7389,7 +7382,7 @@ function seatAskQuestion(period){
     var size = Math.max(70, Math.min(150, Math.min(base.width, base.height) * 0.14));
     var dirs = [["d", 0, -1], ["u", 0, 1], ["r", -1, 0], ["l", 1, 0]];
     dirs.forEach(function(d){
-      var a = document.createElement("div");
+      var a = doc.createElement("div");
       a.className = "seatArrow a-" + d[0];
       var gapX = r.width / 2 + size * 0.62, gapY = r.height / 2 + size * 0.62;
       a.style.width = a.style.height = size + "px";
@@ -7435,10 +7428,10 @@ function seatAskQuestion(period){
   function muteLabel(){ ov.querySelector(".seatAskMute").textContent = state.seatCallsMute ? "🔇 Sound off" : "🔊 Sound on"; }
   ov.querySelector(".seatAskMute").onclick = function(){ state.seatCallsMute = !state.seatCallsMute; saveState(); muteLabel(); };
   ov.querySelector(".seatAskRec").onclick = function(){ side.hidden = !side.hidden; if (!side.hidden) drawRecord(); setTimeout(function(){ api.fitNow(); placeArrows(); }, 0); };
-  function close(){ clearTimeout(timer); window.removeEventListener("resize", onResize); ov.remove(); renderAll(); }
+  function close(){ clearTimeout(timer); doc.defaultView.removeEventListener("resize", onResize); ov.remove(); renderAll(); }
   ov.querySelector(".seatAskClose").onclick = close;
   function onResize(){ setTimeout(placeArrows, 50); }
-  window.addEventListener("resize", onResize);
+  doc.defaultView.addEventListener("resize", onResize);
   ov.addEventListener("keydown", function(e){
     e.stopPropagation();
     if (e.key === "Escape") close();
