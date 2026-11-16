@@ -6606,12 +6606,14 @@ function seatMount(host, o){
     var cw = host.clientWidth, ch = host.clientHeight;
     if (!cw || !ch) return;
     var H = parseFloat(room.style.height) || SEAT_MIN_H;
-    var s = Math.min(cw / SEAT_W, ch / H);
+    // o.crop (a part of the room) fills the space instead of the whole room; the rest is cut off
+    var c = o.crop ? o.crop() : null, vw = c ? c.w : SEAT_W, vh = c ? c.h : H;
+    var s = Math.min(cw / vw, ch / vh);
     if (o.maxScale) s = Math.min(s, o.maxScale);
     api.scale = s;
     room.style.transform = "scale(" + s + ")";
-    fit.style.left = Math.max(0, (cw - SEAT_W*s) / 2) + "px";
-    fit.style.top = Math.max(0, (ch - H*s) / 2) + "px";
+    fit.style.left = (Math.max(0, (cw - vw*s) / 2) - (c ? c.x*s : 0)) + "px";
+    fit.style.top = (Math.max(0, (ch - vh*s) / 2) - (c ? c.y*s : 0)) + "px";
   };
   api.draw = function(){ seatDraw(room, o); api.fitNow(); };
   api.toRoom = function(cx, cy){ var r = room.getBoundingClientRect(); return { x: (cx - r.left) / api.scale, y: (cy - r.top) / api.scale }; };
@@ -7311,6 +7313,25 @@ function seatSound(kind){
   else if (kind === "soft") note(440, 0, 0.25, "sine", 0.15);
 }
 
+// how the spin runs: steps (plus up to extra-1 more), first delay in ms, how much each step slows,
+// and the last `tail` steps slow by `slow` each. Instant has no spin at all.
+var SEAT_SPIN_SPEEDS = {
+  slow:    { name: "Slow",    icon: "🐢", steps: 26, extra: 6, delay: 45, grow: 2, tail: 10, slow: 1.28 },
+  medium:  { name: "Medium",  icon: "🚶", steps: 16, extra: 4, delay: 40, grow: 1, tail: 6,  slow: 1.25 },
+  fast:    { name: "Fast",    icon: "🏃", steps: 8,  extra: 3, delay: 35, grow: 0, tail: 3,  slow: 1.22 },
+  instant: { name: "Instant", icon: "⚡", steps: 0 }
+};
+function seatSpinSpeed(){ return SEAT_SPIN_SPEEDS[state.seatSpinSpeed] ? state.seatSpinSpeed : "slow"; }
+// the part of the room with desks and tables (room coordinates), with room for table labels and arrows
+function seatDesksArea(){
+  var items = seatState().items.filter(function(it){ return seatIsSeatKind(it.kind); });
+  if (!items.length) return null;
+  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  items.forEach(function(it){ x0 = Math.min(x0, it.x); y0 = Math.min(y0, it.y); x1 = Math.max(x1, it.x + it.w); y1 = Math.max(y1, it.y + it.h); });
+  var pad = 30;
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad - 14); x1 += pad; y1 += pad;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
 function seatAskQuestion(period, doc){
   doc = doc || document;   // a popped-out seating chart spins in its own window
   seatCss(doc);
@@ -7322,7 +7343,7 @@ function seatAskQuestion(period, doc){
     '<div class="seatAskTop">' +
       '<h3>❓ Ask a question · ' + escapeHtml(period) + '</h3><span class="seatAskRound"></span>' +
       '<div style="flex:1"></div>' +
-      '<button class="seatBtn seatAskMute"></button><button class="seatBtn seatAskRec">📋 Record</button><button class="seatBtn seatAskClose">Close</button>' +
+      '<button class="seatBtn seatAskSpeed" title="How fast the spin goes"></button><button class="seatBtn seatAskMute"></button><button class="seatBtn seatAskRec">📋 Record</button><button class="seatBtn seatAskClose">Close</button>' +
     '</div>' +
     '<div class="seatAskMain"><div class="seatAskStage"><div class="seatFitHost seatAskHost"></div><div class="seatAskArrows"></div></div><div class="seatAskSide" hidden></div></div>' +
     '<div class="seatAskBottom">' +
@@ -7333,7 +7354,8 @@ function seatAskQuestion(period, doc){
   ov.focus();
   var host = ov.querySelector(".seatAskHost"), arrows = ov.querySelector(".seatAskArrows"), side = ov.querySelector(".seatAskSide");
   var nameEl = ov.querySelector(".seatAskName"), btns = ov.querySelector(".seatAskBtns");
-  var o = { period: period, mode: "view", showTags: false, money: true };
+  // zoomed in on the desks and tables, so the names are as big as they can be
+  var o = { period: period, mode: "view", showTags: false, money: true, maxScale: 3, crop: seatDesksArea };
   var api = seatMount(host, o);
   var pick = null, spinning = false, timer = null;
 
@@ -7367,7 +7389,9 @@ function seatAskQuestion(period, doc){
     if (!chosen) return;
     clearPick(); pick = null; spinning = true; setButtons();
     nameEl.textContent = "🎲 Who will it be…";
-    var seated = seatSeated(per), steps = [], prev = null, n = 26 + Math.floor(Math.random() * 6);
+    var sp = SEAT_SPIN_SPEEDS[seatSpinSpeed()];
+    if (!sp.steps){ land(chosen); return; }   // instant
+    var seated = seatSeated(per), steps = [], prev = null, n = sp.steps + Math.floor(Math.random() * sp.extra);
     for (var i=0;i<n;i++){
       var x;
       do { x = seated[Math.floor(Math.random() * seated.length)]; } while (seated.length > 1 && x.sid === prev);
@@ -7375,7 +7399,7 @@ function seatAskQuestion(period, doc){
     }
     if (steps[steps.length-1] === chosen.sid && seated.length > 1) steps.pop();
     steps.push(chosen.sid);
-    var i2 = 0, delay = 45;
+    var i2 = 0, delay = sp.delay;
     (function step(){
       [].forEach.call(api.room.querySelectorAll(".spinHi"), function(e){ e.classList.remove("spinHi"); });
       var e = slotEl(steps[i2]);
@@ -7384,7 +7408,7 @@ function seatAskQuestion(period, doc){
       i2++;
       if (i2 < steps.length){
         // slows down near the end
-        delay = i2 < steps.length - 10 ? 45 + i2 * 2 : delay * 1.28;
+        delay = i2 < steps.length - sp.tail ? sp.delay + i2 * sp.grow : delay * sp.slow;
         timer = setTimeout(step, delay);
       } else {
         timer = setTimeout(function(){ land(chosen); }, 250);
@@ -7415,8 +7439,11 @@ function seatAskQuestion(period, doc){
       a.className = "seatArrow a-" + d[0];
       var gapX = r.width / 2 + size * 0.62, gapY = r.height / 2 + size * 0.62;
       a.style.width = a.style.height = size + "px";
-      a.style.left = (cx + d[1] * gapX - size / 2) + "px";
-      a.style.top = (cy + d[2] * gapY - size / 2) + "px";
+      // a desk at the edge of the view: an arrow that would go off screen is left out (the others still point)
+      var ax = cx + d[1] * gapX - size / 2, ay = cy + d[2] * gapY - size / 2, slack = size * 0.3;
+      if (ax < -slack || ay < -slack || ax + size > base.width + slack || ay + size > base.height + slack) return;
+      a.style.left = Math.max(0, Math.min(base.width - size, ax)) + "px";
+      a.style.top = Math.max(0, Math.min(base.height - size, ay)) + "px";
       // drawn pointing down, then turned toward the seat
       var rot = { d: 0, u: 180, r: -90, l: 90 }[d[0]];
       a.innerHTML = '<svg viewBox="0 0 100 100" style="transform:rotate(' + rot + 'deg)"><path d="M32 4h36v46h22L50 96 10 50h22z" fill="url(#seatArrowFill)" stroke="#7a3b00" stroke-width="4" stroke-linejoin="round"/>' +
@@ -7454,6 +7481,12 @@ function seatAskQuestion(period, doc){
       showConfirm("Start a new round for " + period + "? Everyone can be called on again.", function(ok){ if (ok){ seatCalls(period).round = {}; saveState(); redraw(); } });
     };
   }
+  function speedLabel(){ var k = seatSpinSpeed(); ov.querySelector(".seatAskSpeed").textContent = SEAT_SPIN_SPEEDS[k].icon + " Speed: " + SEAT_SPIN_SPEEDS[k].name; }
+  ov.querySelector(".seatAskSpeed").onclick = function(){
+    var keys = Object.keys(SEAT_SPIN_SPEEDS);
+    state.seatSpinSpeed = keys[(keys.indexOf(seatSpinSpeed()) + 1) % keys.length]; saveState(); speedLabel();
+  };
+  speedLabel();
   function muteLabel(){ ov.querySelector(".seatAskMute").textContent = state.seatCallsMute ? "🔇 Sound off" : "🔊 Sound on"; }
   ov.querySelector(".seatAskMute").onclick = function(){ state.seatCallsMute = !state.seatCallsMute; saveState(); muteLabel(); };
   ov.querySelector(".seatAskRec").onclick = function(){ side.hidden = !side.hidden; if (!side.hidden) drawRecord(); setTimeout(function(){ api.fitNow(); placeArrows(); }, 0); };
