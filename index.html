@@ -597,6 +597,9 @@ padding: 18px; color: #e6ebf1;
 .roach { position: absolute; left: 0; top: 0; width: 30px; height: 42px; will-change: transform; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
 .roach .roachLeg { stroke: #4a2610; stroke-width: 1.3; fill: none; stroke-linecap: round; transform-box: view-box; animation: roachLeg .06s linear infinite alternate; }
 .roach .roachLeg.r1 { animation-delay: -.03s; }
+.chamTongue { position: absolute; height: 6px; border-radius: 3px; background: #ff6f9b; transform-origin: 0 50%; box-shadow: 0 0 0 1px rgba(150,30,70,.4); }
+.chamTongue::after { content: ""; position: absolute; right: -6px; top: -4px; width: 14px; height: 14px; border-radius: 50%; background: #ff4f86; }
+.critCham.snap, .critCham.snap .chF, .critCham.snap .chS, .critCham.snap .chD { transition-duration: .3s !important; }
 @keyframes roachLeg { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
 .animMsg { font-size: 12px; color: #ffc078; margin-top: 6px; min-height: 0; }
 .modalSection { margin-bottom: 18px; }
@@ -6273,6 +6276,13 @@ function roachesRun(count){
   layer.className = "roachLayer";
   document.body.appendChild(layer);
   var vw = window.innerWidth, vh = window.innerHeight, left = count || 6;
+  // the chameleon, if it's out, eats one that comes near its mouth (one roach makes sure to come by)
+  var cham = crit.cham && !crit.cham.gone ? crit.cham : null, eaten = false;
+  function mouth(){
+    var inner = cham.el.firstChild, r = inner.getBoundingClientRect(), flip = /scaleX\(-1\)/.test(inner.style.transform);
+    return { x: r.left + (flip ? 13 / 160 : 147 / 160) * r.width, y: r.top + 41 / 90 * r.height, dir: flip ? -1 : 1 };
+  }
+  if (cham){ var m0 = mouth(); if (m0.x < 0 || m0.x > vw || m0.y < 0 || m0.y > vh) cham = null; }
   function edgePoint(){
     var e = Math.floor(Math.random() * 4), m = 60;
     return e === 0 ? { x: -m, y: critRand(0, vh) } : e === 1 ? { x: vw + m, y: critRand(0, vh) } : e === 2 ? { x: critRand(0, vw), y: -m } : { x: critRand(0, vw), y: vh + m };
@@ -6282,6 +6292,7 @@ function roachesRun(count){
     var pts = [edgePoint()], loops = 2 + Math.floor(Math.random() * 2);
     for (var l=0;l<loops;l++){
       var cx = critRand(vw * 0.15, vw * 0.85), cy = critRand(vh * 0.15, vh * 0.85), r = critRand(35, 85), dir = Math.random() < 0.5 ? 1 : -1, a0 = Math.random() * Math.PI * 2;
+      if (cham && i === 0 && l === 0){ var mp = mouth(); cx = mp.x + mp.dir * 150; cy = mp.y; r = 70; }
       for (var k=0;k<=18;k++){ var a = a0 + dir * k / 18 * Math.PI * 2; pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r }); }
     }
     pts.push(edgePoint());
@@ -6298,6 +6309,16 @@ function roachesRun(count){
       if (d >= lens[lens.length - 1]){ el.remove(); if (--left <= 0) layer.remove(); return; }
       while (lens[seg] < d) seg++;
       var a = pts[seg-1], b = pts[seg], f = (d - lens[seg-1]) / (lens[seg] - lens[seg-1] || 1);
+      var x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+      if (cham && !eaten && !cham.gone){
+        var mp2 = mouth();
+        // in front of its mouth and close: snap
+        if (Math.hypot(x - mp2.x, y - mp2.y) < 150 && (x - mp2.x) * mp2.dir > 25){
+          eaten = true;
+          chamEat(cham, mp2, el, x, y, function(){ if (--left <= 0) layer.remove(); });
+          return;
+        }
+      }
       var target = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
       if (ang === null) ang = target;
       var diff = ((target - ang + 540) % 360) - 180;
@@ -6308,6 +6329,34 @@ function roachesRun(count){
     el.style.transform = "translate(" + (pts[0].x - 15) + "px," + (pts[0].y - 21) + "px)";
     requestAnimationFrame(frame);
   })(i);
+}
+
+// the chameleon's tongue shoots out, grabs the roach at (x, y) and reels it in; it flashes green for a moment
+function chamEat(me, m, roach, x, y, done){
+  var layer = roach.parentNode, dx = x - m.x, dy = y - m.y, len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  var tongue = document.createElement("div");
+  tongue.className = "chamTongue";
+  tongue.style.cssText = "left:" + m.x + "px;top:" + (m.y - 3) + "px;width:" + len + "px;transform:rotate(" + ang + "deg) scaleX(0);";
+  layer.appendChild(tongue);
+  roach.querySelectorAll(".roachLeg").forEach(function(l){ l.style.animationDuration = ".03s"; });
+  tongue.getBoundingClientRect();
+  tongue.style.transition = "transform .12s ease-out";
+  tongue.style.transform = "rotate(" + ang + "deg) scaleX(1)";
+  var wasBlended = me.el.firstChild.classList.contains("blended");
+  if (wasBlended){ me.el.firstChild.classList.add("snap"); chamBlend(me, false); }
+  setTimeout(function(){
+    // reel it in
+    tongue.style.transition = "transform .18s ease-in";
+    tongue.style.transform = "rotate(" + ang + "deg) scaleX(0)";
+    roach.style.transition = "transform .18s ease-in, opacity .18s";
+    roach.style.transform = "translate(" + (m.x - 15) + "px," + (m.y - 21) + "px) rotate(" + (ang + 90) + "deg) scale(.4)";
+    roach.style.opacity = "0";
+    setTimeout(function(){
+      tongue.remove(); roach.remove();
+      if (done) done();
+      if (wasBlended) setTimeout(function(){ if (!me.gone){ chamBlend(me, true); me.el.firstChild.classList.remove("snap"); } }, 2200);
+    }, 200);
+  }, 140);
 }
 
 // turned on or off in Settings
