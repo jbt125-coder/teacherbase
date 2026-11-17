@@ -597,6 +597,23 @@ padding: 18px; color: #e6ebf1;
 .roach { position: absolute; left: 0; top: 0; width: 30px; height: 42px; will-change: transform; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
 .roach .roachLeg { stroke: #4a2610; stroke-width: 1.3; fill: none; stroke-linecap: round; transform-box: view-box; animation: roachLeg .06s linear infinite alternate; }
 .roach .roachLeg.r1 { animation-delay: -.03s; }
+.chamStick { position: absolute; height: 8px; border-radius: 4px; background: linear-gradient(#a0703c, #6e4a22); box-shadow: 0 2px 3px rgba(0,0,0,.35); transform: scaleX(0); transform-origin: 0 50%; transition: transform 1.2s ease-out; }
+.chamStick.fromRight { transform-origin: 100% 50%; }
+.chamStick.out { transform: scaleX(1); }
+.chamStick .twig { position: absolute; width: 18px; height: 4px; border-radius: 2px; background: #7a5530; }
+.chamStick .twig.t1 { left: 30%; top: -5px; transform: rotate(-30deg); }
+.chamStick .twig.t2 { left: 62%; top: 7px; transform: rotate(25deg); }
+.butterfly { position: absolute; left: 0; top: 0; width: 44px; height: 38px; will-change: transform; }
+.butterfly .bfWing { transform-box: view-box; animation: bfFlap .18s ease-in-out infinite alternate; }
+.butterfly .bfWing.l { transform-origin: 22px 19px; }
+.butterfly .bfWing.r { transform-origin: 22px 19px; }
+@keyframes bfFlap { from { transform: scaleX(1); } to { transform: scaleX(.25); } }
+.critCham.female { --c: #4fb3a1; --d: #2c7a6c; }
+.critCham.display svg { animation: chamBob .32s ease-in-out infinite alternate !important; }
+@keyframes chamBob { from { transform: translateY(0) rotate(0deg); } to { transform: translateY(-9px) rotate(-4deg); } }
+.chamHeart { position: absolute; font-size: 42px; transform: translate(-50%, -50%) scale(0); animation: chamHeartPop 2.6s ease-out forwards; pointer-events: none; }
+.chamHeart.fade { transition: opacity 1.5s; opacity: 0; }
+@keyframes chamHeartPop { 0% { transform: translate(-50%, -50%) scale(0); } 25% { transform: translate(-50%, -60%) scale(1.25); } 40% { transform: translate(-50%, -60%) scale(1); } 100% { transform: translate(-50%, -110%) scale(1.05); } }
 .chamTongue { position: absolute; height: 6px; border-radius: 3px; background: #ff6f9b; transform-origin: 0 50%; box-shadow: 0 0 0 1px rgba(150,30,70,.4); }
 .chamTongue::after { content: ""; position: absolute; right: -6px; top: -4px; width: 14px; height: 14px; border-radius: 50%; background: #ff4f86; }
 .critCham.snap, .critCham.snap .chF, .critCham.snap .chS, .critCham.snap .chD { transition-duration: .3s !important; }
@@ -5929,6 +5946,7 @@ function critMover(el, x, y, ang){
     return ms;
   };
   m.place();
+  if (el.isConnected) el.getBoundingClientRect();   // so the first walk starts here, not from the corner
   return m;
 }
 function critSvg(markup, w, h, cls){
@@ -6174,6 +6192,8 @@ function chamRaise(){
   state.windows.forEach(function(w){ if (w.z > z) z = w.z; });
   chamLayer().style.zIndex = z + 1;
 }
+// head first: the drawing faces right; flipped it faces left
+function chamFace(inner, right){ inner.style.transform = right ? "" : "scaleX(-1)"; }
 function chamStart(){
   if (!critOn("chameleon") || crit.cham) return;
   var W = 170, H = 96, target = chamPickWindow(W, H);
@@ -6185,17 +6205,40 @@ function chamStart(){
   chamLayer().appendChild(el);
   var wel = chamWinEl(target.win), vx = canvas.scrollLeft, vw = canvas.clientWidth;
   var tx = wel.offsetLeft + target.dx, ty = wel.offsetTop + target.dy, fromLeft = tx < vx + vw / 2;
-  var me = crit.cham = { el: el, t: null, gone: false, win: target.win, dx: target.dx, dy: target.dy, follow: null };
+  var me = crit.cham = { el: el, t: null, gone: false, win: target.win, dx: target.dx, dy: target.dy, follow: null, fromLeft: fromLeft, extras: [] };
   var inner = el.firstChild;
-  inner.style.transform = fromLeft ? "" : "scaleX(-1)";
-  me.m = critMover(el, fromLeft ? vx - W : vx + vw + W, ty, 0);
-  inner.classList.add("walking");
-  me.m.go(tx, ty, 26, function(){
+  chamFace(inner, fromLeft);
+  el.style.visibility = "hidden";
+  me.m = critMover(el, fromLeft ? vx - W / 2 - 10 : vx + vw + W / 2 + 10, ty, 0);
+  // a branch slides out from the edge of the screen to the window; it walks along it and steps off onto the window
+  var feet = ty + H * 0.33, edge = fromLeft ? vx : vx + vw, end = fromLeft ? wel.offsetLeft + 26 : wel.offsetLeft + wel.offsetWidth - 26;
+  var stick = document.createElement("div");
+  stick.className = "chamStick" + (fromLeft ? "" : " fromRight");
+  stick.style.cssText = "left:" + Math.min(edge, end) + "px;top:" + (feet - 4) + "px;width:" + Math.abs(end - edge) + "px;";
+  stick.innerHTML = '<span class="twig t1"></span><span class="twig t2"></span>';
+  chamLayer().insertBefore(stick, el);
+  me.extras.push(stick);
+  stick.getBoundingClientRect();
+  stick.classList.add("out");
+  me.t = setTimeout(function(){
     if (me.gone) return;
-    inner.classList.remove("walking");
-    me.follow = setInterval(function(){ chamFollow(me); }, 200);
-    me.t = setTimeout(function(){ chamBlend(me, true); }, 1500);
-  }, true);
+    el.style.visibility = "";
+    inner.classList.add("walking");
+    me.m.go(end + (fromLeft ? 40 : -40), ty, 26, function(){
+      if (me.gone) return;
+      // off the branch: it slides back away
+      stick.classList.remove("out");
+      setTimeout(function(){ stick.remove(); }, 1300);
+      me.m.go(tx, ty, 26, function(){
+        if (me.gone) return;
+        inner.classList.remove("walking");
+        me.follow = setInterval(function(){ chamFollow(me); }, 200);
+        me.t = setTimeout(function(){ chamBlend(me, true); }, 1500);
+        // a few minutes later a butterfly comes by; after that, a mate
+        me.bt = setTimeout(function(){ chamButterfly(me); }, critWait(3 * 60000));
+      }, true);
+    }, true);
+  }, 1300);
   el.addEventListener("click", function(){ chamLeave(); });
 }
 // stays on its window as it moves; leaves if the window goes away
@@ -6239,9 +6282,10 @@ function chamBlend(me, on){
 function chamLeave(){
   var me = crit.cham;
   if (!me || me.gone) return;
-  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); clearInterval(me.follow);
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); clearInterval(me.follow); chamClearExtras(me);
   crit.cham = null;
   var el = me.el, inner = el.firstChild;
+  inner.classList.remove("display");
   chamBlend(me, false);
   var vx = canvas.scrollLeft, vw = canvas.clientWidth, goLeft = me.m.x < vx + vw / 2;
   setTimeout(function(){
@@ -6256,7 +6300,123 @@ function chamRemove(){
   var me = crit.cham;
   clearTimeout(crit.wait.chameleon);
   if (!me) return;
-  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); clearInterval(me.follow); me.el.remove(); crit.cham = null;
+  me.gone = true; clearTimeout(me.t); clearTimeout(me.m.t); clearInterval(me.follow); chamClearExtras(me); me.el.remove(); crit.cham = null;
+}
+// the branch, a butterfly, the female, the heart: gone with him
+function chamClearExtras(me){
+  clearTimeout(me.bt); clearTimeout(me.mt);
+  (me.extras || []).forEach(function(x){ if (x.stop) x.stop(); else if (x.remove) x.remove(); });
+  me.extras = [];
+}
+// where its mouth is on the screen, and which way it faces
+function chamMouth(me){
+  var inner = me.el.firstChild, r = inner.getBoundingClientRect(), flip = /scaleX\(-1\)/.test(inner.style.transform);
+  return { x: r.left + (flip ? 13 / 160 : 147 / 160) * r.width, y: r.top + 41 / 90 * r.height, dir: flip ? -1 : 1 };
+}
+
+/* a butterfly flutters in and hovers in front of it; it gets eaten */
+var BUTTERFLY_SVG = '<svg viewBox="0 0 44 38" width="100%" height="100%">' +
+  '<g class="bfWing l"><path d="M21 18 C12 2 2 2 3 11 C4 17 12 19 21 19 Z" fill="#ff9f1c" stroke="#3b2410" stroke-width="1.2"/>' +
+  '<path d="M21 20 C13 22 6 27 8 32 C10 36 17 30 21 22 Z" fill="#ffbf3f" stroke="#3b2410" stroke-width="1.2"/><circle cx="8" cy="9" r="1.6" fill="#fff"/><circle cx="12" cy="6" r="1.1" fill="#fff"/></g>' +
+  '<g class="bfWing r"><path d="M23 18 C32 2 42 2 41 11 C40 17 32 19 23 19 Z" fill="#ff9f1c" stroke="#3b2410" stroke-width="1.2"/>' +
+  '<path d="M23 20 C31 22 38 27 36 32 C34 36 27 30 23 22 Z" fill="#ffbf3f" stroke="#3b2410" stroke-width="1.2"/><circle cx="36" cy="9" r="1.6" fill="#fff"/><circle cx="32" cy="6" r="1.1" fill="#fff"/></g>' +
+  '<ellipse cx="22" cy="20" rx="1.7" ry="9" fill="#2b2118"/><path d="M21 12 C19 6 17 4 15 3 M23 12 C25 6 27 4 29 3" stroke="#2b2118" stroke-width=".9" fill="none"/></svg>';
+function chamButterfly(me){
+  if (me.gone) return;
+  var m = chamMouth(me), vw = window.innerWidth, vh = window.innerHeight;
+  var layer = document.createElement("div");
+  layer.className = "roachLayer";
+  document.body.appendChild(layer);
+  var bf = document.createElement("div");
+  bf.className = "butterfly";
+  bf.innerHTML = BUTTERFLY_SVG;
+  layer.appendChild(bf);
+  var stopped = false;
+  me.extras.push({ stop: function(){ stopped = true; layer.remove(); } });
+  // in from the side it's facing, a lazy wander, then hovering just in front of its mouth
+  var sx = m.dir > 0 ? vw + 40 : -40, pts = [{ x: sx, y: critRand(vh * 0.1, vh * 0.6) }];
+  for (var i=0;i<2;i++) pts.push({ x: critRand(vw * 0.2, vw * 0.8), y: critRand(vh * 0.15, vh * 0.75) });
+  var hover = { x: m.x + m.dir * 120, y: m.y - 30 };
+  hover.x = Math.max(30, Math.min(vw - 30, hover.x));
+  pts.push(hover);
+  var lens = [0];
+  for (var j=1;j<pts.length;j++) lens.push(lens[j-1] + Math.hypot(pts[j].x - pts[j-1].x, pts[j].y - pts[j-1].y));
+  var t0 = null, seg = 1, speed = 130;
+  function frame(ts){
+    if (stopped || me.gone) return;
+    if (t0 === null) t0 = ts;
+    var t = (ts - t0) / 1000, d = t * speed, total = lens[lens.length - 1];
+    var x, y;
+    if (d >= total){
+      // hovers a moment, then: snap
+      x = hover.x + Math.sin(t * 5) * 6; y = hover.y + Math.sin(t * 9) * 5;
+      if (d >= total + speed * 1.6){
+        var mm = chamMouth(me);
+        chamEat(me, mm, bf, x, y, function(){ layer.remove(); me.mt = setTimeout(function(){ chamMate(me); }, critWait(4 * 60000)); }, 22, 19);
+        return;
+      }
+    } else {
+      while (lens[seg] < d) seg++;
+      var a = pts[seg-1], b = pts[seg], f = (d - lens[seg-1]) / (lens[seg] - lens[seg-1] || 1);
+      x = a.x + (b.x - a.x) * f + Math.sin(t * 4) * 14; y = a.y + (b.y - a.y) * f + Math.sin(t * 7) * 10;
+    }
+    bf.style.transform = "translate(" + (x - 22) + "px," + (y - 19) + "px) rotate(" + Math.sin(t * 3) * 12 + "deg)";
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* the male's head-bob display; a female walks in from the other side, they meet, a heart, and off they go together */
+function chamMate(me){
+  if (me.gone) return;
+  clearInterval(me.follow);   // he's leaving his window
+  var inner = me.el.firstChild, W = 170, H = 96, vx = canvas.scrollLeft, vw = canvas.clientWidth;
+  inner.classList.add("snap"); chamBlend(me, false);
+  setTimeout(function(){ inner.classList.remove("snap"); }, 400);
+  var herRight = me.fromLeft;   // she comes from the side he didn't
+  chamFace(inner, herRight);
+  inner.classList.add("display");
+  var fel = critSvg(CHAM_SVG, W, H, "critCham female");
+  chamLayer().appendChild(fel);
+  me.extras.push(fel);
+  var finner = fel.firstChild;
+  chamFace(finner, !herRight);
+  var fm = critMover(fel, herRight ? vx + vw + W / 2 + 10 : vx - W / 2 - 10, me.m.y, 0);
+  var stopX = me.m.x + (herRight ? 260 : -260);
+  stopX = Math.max(vx + W / 2 + 10, Math.min(vx + vw - W / 2 - 10, stopX));
+  finner.classList.add("walking");
+  fm.go(stopX, me.m.y, 60, function(){
+    if (me.gone) return;
+    finner.classList.remove("walking");
+    // he stops bobbing and walks up to her
+    me.mt = setTimeout(function(){
+      if (me.gone) return;
+      inner.classList.remove("display"); inner.classList.add("walking");
+      me.m.go(fm.x + (herRight ? -150 : 150), me.m.y, 30, function(){
+        if (me.gone) return;
+        inner.classList.remove("walking");
+        var heart = document.createElement("div");
+        heart.className = "chamHeart";
+        heart.textContent = "❤️";
+        heart.style.left = ((me.m.x + fm.x) / 2) + "px"; heart.style.top = (me.m.y - H / 2 - 10) + "px";
+        chamLayer().appendChild(heart);
+        me.extras.push(heart);
+        me.mt = setTimeout(function(){
+          if (me.gone) return;
+          // off together, toward the side she came from, her in front
+          me.gone = true; clearTimeout(me.t);
+          crit.cham = null;
+          var out = herRight ? vx + vw + W : vx - W;
+          chamFace(inner, herRight); chamFace(finner, herRight);
+          inner.classList.add("walking"); finner.classList.add("walking");
+          heart.classList.add("fade");
+          var ms = Math.max(me.m.go(out + (herRight ? 140 : -140), me.m.y, 28, null, true), fm.go(out + (herRight ? 260 : -260), me.m.y, 28, null, true));
+          setTimeout(function(){ me.el.remove(); fel.remove(); heart.remove(); }, ms + 200);
+          critLater("chameleon", chamStart, 10 * 60000);
+        }, 2600);
+      }, true);
+    }, 1200);
+  }, true);
 }
 /* ---------- cockroaches: a quick scare, from the Roaches! button ---------- */
 var ROACH_SVG = (function(){
@@ -6278,10 +6438,7 @@ function roachesRun(count){
   var vw = window.innerWidth, vh = window.innerHeight, left = count || 6;
   // the chameleon, if it's out, eats one that comes near its mouth (one roach makes sure to come by)
   var cham = crit.cham && !crit.cham.gone ? crit.cham : null, eaten = false;
-  function mouth(){
-    var inner = cham.el.firstChild, r = inner.getBoundingClientRect(), flip = /scaleX\(-1\)/.test(inner.style.transform);
-    return { x: r.left + (flip ? 13 / 160 : 147 / 160) * r.width, y: r.top + 41 / 90 * r.height, dir: flip ? -1 : 1 };
-  }
+  function mouth(){ return chamMouth(cham); }
   if (cham){ var m0 = mouth(); if (m0.x < 0 || m0.x > vw || m0.y < 0 || m0.y > vh) cham = null; }
   function edgePoint(){
     var e = Math.floor(Math.random() * 4), m = 60;
@@ -6332,7 +6489,8 @@ function roachesRun(count){
 }
 
 // the chameleon's tongue shoots out, grabs the roach at (x, y) and reels it in; it flashes green for a moment
-function chamEat(me, m, roach, x, y, done){
+function chamEat(me, m, roach, x, y, done, ox, oy){
+  ox = ox || 15; oy = oy || 21;
   var layer = roach.parentNode, dx = x - m.x, dy = y - m.y, len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
   var tongue = document.createElement("div");
   tongue.className = "chamTongue";
@@ -6349,7 +6507,7 @@ function chamEat(me, m, roach, x, y, done){
     tongue.style.transition = "transform .18s ease-in";
     tongue.style.transform = "rotate(" + ang + "deg) scaleX(0)";
     roach.style.transition = "transform .18s ease-in, opacity .18s";
-    roach.style.transform = "translate(" + (m.x - 15) + "px," + (m.y - 21) + "px) rotate(" + (ang + 90) + "deg) scale(.4)";
+    roach.style.transform = "translate(" + (m.x - ox) + "px," + (m.y - oy) + "px) rotate(" + (ang + 90) + "deg) scale(.4)";
     roach.style.opacity = "0";
     setTimeout(function(){
       tongue.remove(); roach.remove();
