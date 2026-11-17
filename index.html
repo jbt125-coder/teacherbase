@@ -590,6 +590,10 @@ padding: 18px; color: #e6ebf1;
 .modalCard h3 { margin: 0 0 12px; font-size: 16px; letter-spacing: 0.2px; }
 .animOpt { display: flex !important; gap: 8px; align-items: flex-start; font-size: 12.5px !important; line-height: 1.4; color: #c9d4e0 !important; margin: 6px 0 !important; text-transform: none !important; letter-spacing: 0 !important; font-weight: 500 !important; cursor: pointer; }
 .animOpt input { margin-top: 2px; accent-color: #1f8f7d; }
+.animNow { display: flex; gap: 8px; margin-top: 8px; }
+.animNow button { flex: 1; border: 1px solid #35455c; background: #242f42; color: #dce6f0; border-radius: 8px; padding: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.animNow button:hover { background: #2c3a52; }
+.animMsg { font-size: 12px; color: #ffc078; margin-top: 6px; min-height: 0; }
 .modalSection { margin-bottom: 18px; }
 .modalSection label { display: block; font-size: 11px; color: #8fa3ba; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
 .addWinGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -2854,8 +2858,10 @@ card.appendChild(themeSec);
 var animSec = document.createElement("div");
 animSec.className = "modalSection";
 animSec.innerHTML = "<label>Board animals</label>" +
-  '<label class="animOpt"><input type="checkbox" data-an="spider"> 🕷️ Spider: builds a web on empty board space and catches flies. Click it and it climbs away.</label>' +
-  '<label class="animOpt"><input type="checkbox" data-an="chameleon"> 🦎 Chameleon: crawls in and blends into the board. Click it and it walks away, back in about 10 minutes.</label>';
+  '<label class="animOpt"><input type="checkbox" data-an="spider"> 🕷️ Spider: strings a web between your windows and catches flies. Click it and it climbs away.</label>' +
+  '<label class="animOpt"><input type="checkbox" data-an="chameleon"> 🦎 Chameleon: climbs onto a window and blends in. Click it and it walks away, back in about 10 minutes.</label>' +
+  '<div class="animNow"><button type="button" data-now="spider">🕷️ Spider now</button><button type="button" data-now="chameleon">🦎 Chameleon now</button></div>' +
+  '<div class="animMsg"></div>';
 [].forEach.call(animSec.querySelectorAll("[data-an]"), function(cb){
   var kind = cb.getAttribute("data-an");
   cb.checked = critOn(kind);
@@ -2863,6 +2869,22 @@ animSec.innerHTML = "<label>Board animals</label>" +
     if (!state.animals) state.animals = {};
     state.animals[kind] = cb.checked; saveState();
     critApply(kind, true);
+  };
+});
+// bring one out right away (and turn it on)
+[].forEach.call(animSec.querySelectorAll("[data-now]"), function(b){
+  var kind = b.getAttribute("data-now"), msg = animSec.querySelector(".animMsg");
+  b.onclick = function(){
+    if (!state.animals) state.animals = {};
+    state.animals[kind] = true; saveState();
+    animSec.querySelector('[data-an="' + kind + '"]').checked = true;
+    var out = kind === "spider" ? crit.spider : crit.cham;
+    if (out){ msg.textContent = (kind === "spider" ? "The spider" : "The chameleon") + " is already out."; return; }
+    clearTimeout(crit.wait[kind]);
+    if (kind === "spider") spiderStart(); else chamStart();
+    if (kind === "spider" ? crit.spider : crit.cham){ document.body.removeChild(overlay); return; }
+    msg.textContent = kind === "spider" ? "No gap between windows for a web right now. It will keep trying every minute." :
+      "No open window big enough to sit on right now. It will keep trying every minute.";
   };
 });
 card.appendChild(animSec);
