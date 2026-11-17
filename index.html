@@ -588,11 +588,7 @@ width: 100%; max-width: 380px; max-height: 86vh; overflow: auto;
 padding: 18px; color: #e6ebf1;
 }
 .modalCard h3 { margin: 0 0 12px; font-size: 16px; letter-spacing: 0.2px; }
-.animOpt { display: flex !important; gap: 8px; align-items: flex-start; font-size: 12.5px !important; line-height: 1.4; color: #c9d4e0 !important; margin: 6px 0 !important; text-transform: none !important; letter-spacing: 0 !important; font-weight: 500 !important; cursor: pointer; }
-.animOpt input { margin-top: 2px; accent-color: #1f8f7d; }
-.animNow { display: flex; gap: 8px; margin-top: 8px; }
-.animNow button { flex: 1; border: 1px solid #35455c; background: #242f42; color: #dce6f0; border-radius: 8px; padding: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.animNow button:hover { background: #2c3a52; }
+.addWinBtn.critBtn.on { background: #1f8f7d; border-color: #1f8f7d; color: #fff; }
 .roachLayer { position: fixed; inset: 0; z-index: 5000; pointer-events: none; overflow: hidden; }
 .roach { position: absolute; left: 0; top: 0; width: 30px; height: 42px; will-change: transform; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
 .roach .roachLeg { stroke: #4a2610; stroke-width: 1.3; fill: none; stroke-linecap: round; transform-box: view-box; animation: roachLeg .06s linear infinite alternate; }
@@ -618,7 +614,6 @@ padding: 18px; color: #e6ebf1;
 .chamTongue::after { content: ""; position: absolute; right: -6px; top: -4px; width: 14px; height: 14px; border-radius: 50%; background: #ff4f86; }
 .critCham.snap, .critCham.snap .chF, .critCham.snap .chS, .critCham.snap .chD { transition-duration: .3s !important; }
 @keyframes roachLeg { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
-.animMsg { font-size: 12px; color: #ffc078; margin-top: 6px; min-height: 0; }
 .modalSection { margin-bottom: 18px; }
 .modalSection label { display: block; font-size: 11px; color: #8fa3ba; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
 .addWinGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -2879,41 +2874,6 @@ for (var key in THEMES){
 themeSec.appendChild(themeGrid);
 card.appendChild(themeSec);
 
-// board animals
-var animSec = document.createElement("div");
-animSec.className = "modalSection";
-animSec.innerHTML = "<label>Board animals</label>" +
-  '<label class="animOpt"><input type="checkbox" data-an="spider"> 🕷️ Spider: strings a web between your windows and catches flies. Click it and it climbs away.</label>' +
-  '<label class="animOpt"><input type="checkbox" data-an="chameleon"> 🦎 Chameleon: climbs onto a window and blends in. Click it and it walks away, back in about 10 minutes.</label>' +
-  '<div class="animNow"><button type="button" data-now="spider">🕷️ Spider now</button><button type="button" data-now="chameleon">🦎 Chameleon now</button><button type="button" data-roach>🪳 Roaches!</button></div>' +
-  '<div class="animMsg"></div>';
-[].forEach.call(animSec.querySelectorAll("[data-an]"), function(cb){
-  var kind = cb.getAttribute("data-an");
-  cb.checked = critOn(kind);
-  cb.onchange = function(){
-    if (!state.animals) state.animals = {};
-    state.animals[kind] = cb.checked; saveState();
-    critApply(kind, true);
-  };
-});
-animSec.querySelector("[data-roach]").onclick = function(){ document.body.removeChild(overlay); roachesRun(6); };
-// bring one out right away (and turn it on)
-[].forEach.call(animSec.querySelectorAll("[data-now]"), function(b){
-  var kind = b.getAttribute("data-now"), msg = animSec.querySelector(".animMsg");
-  b.onclick = function(){
-    if (!state.animals) state.animals = {};
-    state.animals[kind] = true; saveState();
-    animSec.querySelector('[data-an="' + kind + '"]').checked = true;
-    var out = kind === "spider" ? crit.spider : crit.cham;
-    if (out){ msg.textContent = (kind === "spider" ? "The spider" : "The chameleon") + " is already out."; return; }
-    clearTimeout(crit.wait[kind]);
-    if (kind === "spider") spiderStart(); else chamStart();
-    if (kind === "spider" ? crit.spider : crit.cham){ document.body.removeChild(overlay); return; }
-    msg.textContent = kind === "spider" ? "No gap between windows for a web right now. It will keep trying every minute." :
-      "No open window big enough to sit on right now. It will keep trying every minute.";
-  };
-});
-card.appendChild(animSec);
 
 // add window section
 var addSec = document.createElement("div");
@@ -2934,6 +2894,19 @@ for (var i=0;i<AVAILABLE_NEW_WINDOWS.length;i++){
     grid.appendChild(b);
   })(AVAILABLE_NEW_WINDOWS[i]);
 }
+// critters: one switch for the spider, the chameleon (with its butterfly and mate) and the roaches
+var critB = document.createElement("button");
+function critLabel(){ var on = critOn("spider") || critOn("chameleon") || critOn("roaches"); critB.className = "addWinBtn critBtn" + (on ? " on" : ""); critB.textContent = "🐾 Critters: " + (on ? "ON" : "OFF"); return on; }
+critLabel();
+critB.title = "Spider, chameleon and roaches that show up on the board now and then";
+critB.onclick = function(){
+  var on = !critLabel();
+  state.animals = { spider: on, chameleon: on, roaches: on };
+  saveState();
+  ["spider", "chameleon", "roaches"].forEach(function(k){ critApply(k, true); });
+  document.body.removeChild(overlay);
+};
+grid.appendChild(critB);
 addSec.appendChild(grid);
 card.appendChild(addSec);
 
@@ -6522,8 +6495,11 @@ function critApply(kind, soon){
   var on = critOn(kind);
   if (kind === "spider"){ if (!on) spiderRemove(); else if (!crit.spider) critLater("spider", spiderStart, soon ? 15000 : critRand(30000, 60000)); }
   if (kind === "chameleon"){ if (!on) chamRemove(); else if (!crit.cham) critLater("chameleon", chamStart, soon ? 20000 : critRand(40000, 80000)); }
+  if (kind === "roaches"){ if (!on) clearTimeout(crit.wait.roaches); else roachesLater(critRand(10, 20) * 60000); }
 }
-function critInit(){ critApply("spider"); critApply("chameleon"); }
+// while critters are on, the roaches dash through every 10-20 minutes
+function roachesLater(ms){ critLater("roaches", function(){ if (!critOn("roaches")) return; if (!document.hidden) roachesRun(6); roachesLater(critRand(10, 20) * 60000); }, ms); }
+function critInit(){ critApply("spider"); critApply("chameleon"); critApply("roaches"); }
 
 /* ============================================================
 FRIDAY VIDEO — on Fridays with a class schedule, a big window pops up
