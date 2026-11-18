@@ -50,7 +50,7 @@ font-size: 19px; cursor: pointer; border-left: 1px solid #2c3a4f;
 
 /* ––––– Canvas where windows live ––––– */
 #canvas {
-position: absolute; top: 42px; left: 0; right: 0; bottom: 40px;
+position: absolute; top: 42px; left: 0; right: 0; bottom: 40px; z-index: 0;
 overflow: auto;
 -webkit-overflow-scrolling: touch;
 }
@@ -1034,10 +1034,24 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     return null;
   }
 
+  // ⊞ windows (the usual) stack in front of every ⊟ window; each group stacks by last click
+  function winZ(w){ return (w.layer === "back" ? 0 : 100000) + (w.z || 1); }
   function bringToFront(w){
     Z += 1; w.z = Z;
     var el = document.getElementById("winel_"+w.id);
-    if (el) el.style.zIndex = Z;
+    if (el) el.style.zIndex = winZ(w);
+  }
+  // the ⊞/⊟ box: in front of everything, or behind all the other windows
+  function setWinLayer(w, back){
+    w.layer = back ? "back" : "front";
+    if (back){
+      var low = Infinity;
+      state.windows.forEach(function(o){ if (o !== w && (o.z || 1) < low) low = o.z || 1; });
+      w.z = Math.min(w.z || 1, (low === Infinity ? 1 : low) - 1);
+      var el = document.getElementById("winel_"+w.id);
+      if (el) el.style.zIndex = winZ(w);
+    } else bringToFront(w);
+    saveState();
   }
 
   function updateCanvasExtent(){
@@ -1076,7 +1090,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
         var chip = document.createElement("div");
         chip.className = "dockChip";
         chip.innerHTML = '<span class="dot2"></span><span>' + escapeHtml(w.title) + '</span>';
-        (function(win){ chip.onclick = function(){ win.closed = false; bringToFront(win); saveState(); renderAll(); }; })(w);
+        (function(win){ chip.onclick = function(){ win.closed = false; win.layer = "front"; bringToFront(win); saveState(); renderAll(); }; })(w);
         if (w.type === "cfu"){
           chip.title = "Click to open. Right-click to ask one question now.";
           chip.oncontextmenu = function(e){ e.preventDefault(); cfuAskOne("Quick check"); };
@@ -1097,13 +1111,13 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
         var gt = document.createElement("div");
         gt.className = "ghostTab";
         gt.title = "Bring back: " + w.title;
-        (function(win){ gt.onclick = function(){ win.sentAway = false; bringToFront(win); saveState(); renderAll(); }; })(w);
+        (function(win){ gt.onclick = function(){ win.sentAway = false; win.layer = "front"; bringToFront(win); saveState(); renderAll(); }; })(w);
         ghostRail.appendChild(gt);
 
         var chip2 = document.createElement("div");
         chip2.className = "dockChip private";
         chip2.innerHTML = '<span>&#128274;</span><span>' + escapeHtml(w.title) + ' (2nd screen)</span>';
-        (function(win){ chip2.onclick = function(){ win.sentAway = false; bringToFront(win); saveState(); renderAll(); }; })(w);
+        (function(win){ chip2.onclick = function(){ win.sentAway = false; win.layer = "front"; bringToFront(win); saveState(); renderAll(); }; })(w);
         dock.appendChild(chip2);
       }
     }
@@ -1141,7 +1155,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     el.style.top = w.y + "px";
     el.style.width = w.w + "px";
     el.style.height = w.h + "px";
-    el.style.zIndex = w.z || 1;
+    el.style.zIndex = winZ(w);
 
     var head = document.createElement("div");
     head.className = "winHead";
@@ -1149,6 +1163,7 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     head.innerHTML =
       (isPrivateType ? '<span class="privTag">TEACHER ONLY</span>' : '') +
       '<div class="winTitle">' + escapeHtml(w.title) + '</div>' +
+      '<button class="winBtn layer" title="' + (w.layer === "back" ? "Behind the other windows. Click to bring it in front of everything" : "In front. Click to send it behind the other windows") + '">' + (w.layer === "back" ? "&#8863;" : "&#8862;") + '</button>' +
       '<button class="winBtn popout" title="Pop out to another window">&#8663;</button>' +
       '<button class="winBtn sendAway" title="Send to other screen">&#8674;</button>' +
       '<button class="winBtn close" title="Minimize to dock (can reopen later)">&#10005;</button>' +
@@ -1170,6 +1185,14 @@ flex: 1; border: none; border-radius: 8px; padding: 10px; font-weight: 700; curs
     head.querySelector(".close").onclick = function(){ w.closed = true; saveState(); renderAll(); };
     head.querySelector(".sendAway").onclick = function(){ sendAwayAnim(el, w); };
     head.querySelector(".popout").onclick = function(){ popOutWindow(w); };
+    var layerB = head.querySelector(".layer");
+    layerB.onmousedown = function(e){ e.stopPropagation(); };   // the window's own mousedown would bring it forward
+    layerB.onclick = function(e){
+      e.stopPropagation();
+      setWinLayer(w, w.layer !== "back");
+      layerB.innerHTML = w.layer === "back" ? "&#8863;" : "&#8862;";
+      layerB.title = w.layer === "back" ? "Behind the other windows. Click to bring it in front of everything" : "In front. Click to send it behind the other windows";
+    };
     head.querySelector(".deleteForever").onclick = function(){
       showConfirm('Delete "' + w.title + '" forever? Its content will be lost, but you can add a fresh one from the cog menu.', function(ok){
         if (!ok) return;
@@ -2933,6 +2956,7 @@ function fillClosedList(){
       row.innerHTML = '<div class="schedName">' + escapeHtml(win.title) + '</div><div class="schedBtns"><button class="smallBtn">Reopen</button></div>';
       row.querySelector("button").onclick = function(){
         win.closed = false;
+        win.layer = "front";
         bringToFront(win);
         saveState();
         renderAll();
@@ -6174,7 +6198,7 @@ function chamLayer(){
 // above every window
 function chamRaise(){
   var z = 1;
-  state.windows.forEach(function(w){ if (w.z > z) z = w.z; });
+  state.windows.forEach(function(w){ if (winZ(w) > z) z = winZ(w); });
   chamLayer().style.zIndex = z + 1;
 }
 // head first: the drawing faces right; flipped it faces left
@@ -6561,7 +6585,7 @@ function fvTick(){
     w.x = Math.round(canvas.scrollLeft + (cw - w.w) / 2); w.y = Math.round(canvas.scrollTop + Math.max(10, (ch - w.h) / 2));
     w.fvPlaced = true;
   }
-  w.closed = false; w.sentAway = false;
+  w.closed = false; w.sentAway = false; w.layer = "front";
   Z += 1; w.z = Z;
   fvOpenFor = key;
   fvAutoplay = true;   // from the start
