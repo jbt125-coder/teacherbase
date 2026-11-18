@@ -7343,7 +7343,8 @@ var SEAT_CSS =
 ".seatSlot.picked{background:#ffe066 !important;z-index:8;animation:seatPickGlow .9s ease-in-out infinite alternate;}" +
 "@keyframes seatPickGlow{from{box-shadow:0 0 0 5px #f08c00,0 0 30px 10px rgba(255,212,59,.8);}to{box-shadow:0 0 0 8px #ff6b00,0 0 60px 22px rgba(255,212,59,1);}}" +
 ".seatSlot.answeredRound{opacity:.55;}" +
-".seatSlot.away-absent{opacity:.35;filter:grayscale(1);}" +
+".seatSlot.away-absent .seatName,.seatSlot.away-absent .seatNum,.seatSlot.away-absent .seatMoney{opacity:.35;filter:grayscale(1);}" +
+".seatAbsentX{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);pointer-events:none;overflow:visible;}" +
 ".seatSlot.away-out{background:rgba(255,236,153,.65) !important;}" +
 ".seatAwayMark{position:absolute;left:3px;bottom:1px;font-size:15px;line-height:1;}";
 
@@ -7448,7 +7449,9 @@ var SEAT_ED_CSS =
 ".seatAskB.answered{background:#1971c2;}" +
 ".seatAskB.skipped{background:#495057;}" +
 ".seatAskB.undo{background:#2b3648;color:#e6ebf1;font-size:15px;}" +
-".seatBtn.seatAskAbsent.on{background:#c92a2a;border-color:#c92a2a;color:#fff;}" +
+".seatAskB.award{background:#2b8a3e;font-size:16px;}" +
+".seatAskB.absent{background:#a61e1e;font-size:16px;}" +
+".seatAskB.award.on,.seatAskB.absent.on{box-shadow:0 0 0 3px #ffe066;}" +
 ".seatAsk.absentMode .seatSlot.filled,.seatAsk .seatSlot.filled{cursor:pointer;}" +
 "@media (max-width:760px){.seatAskSide{position:absolute;right:0;top:0;bottom:0;width:86vw;z-index:30;}}";
 
@@ -7699,7 +7702,8 @@ function seatDraw(room, o){
         if (o.showTags) html += seatTagChips(st);
         if (o.mode === "seats" && st.lock === sid) html += '<span class="seatLock">🔒</span>';
         if (it.kind === "desk") html += '<span class="seatNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
-        if (away[st.id]) html += '<span class="seatAwayMark" title="' + (away[st.id] === "out" ? "Out on a pass" : "Absent today") + '">' + (away[st.id] === "out" ? "🚻" : "🚫") + '</span>';
+        if (away[st.id] === "out") html += '<span class="seatAwayMark" title="Out on a pass">🚻</span>';
+        else if (away[st.id]) html += '<svg class="seatAbsentX" viewBox="0 0 10 10" preserveAspectRatio="none"><title>Absent today</title><path d="M0.5 0.5L9.5 9.5M9.5 0.5L0.5 9.5" stroke="#e03131" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
         if (money[st.id]) html += '<span class="seatMoney" title="Correct answers today">' + (money[st.id] > 3 ? "$" + money[st.id] : new Array(money[st.id] + 1).join("$")) + '</span>';
       } else if (it.kind === "desk"){
         html += '<span class="seatEmptyNum">' + escapeHtml(seatItemLabel(it)) + '</span>';
@@ -8495,7 +8499,6 @@ function seatAskQuestion(period, doc){
     '<div class="seatAskTop">' +
       '<h3>❓ Ask a question · ' + escapeHtml(period) + '</h3><span class="seatAskRound"></span>' +
       '<div style="flex:1"></div>' +
-      '<button class="seatBtn seatAskAbsent" title="Click desks to mark students absent for today (the spinner skips them)">🚫 Mark absent</button>' +
       '<button class="seatBtn seatAskSpeed" title="How fast the spin goes"></button><button class="seatBtn seatAskMute"></button><button class="seatBtn seatAskRec">📋 Record</button><button class="seatBtn seatAskClose">Close</button>' +
     '</div>' +
     '<div class="seatAskMain"><div class="seatAskStage"><div class="seatFitHost seatAskHost"></div><div class="seatAskArrows"></div></div><div class="seatAskSide" hidden></div></div>' +
@@ -8513,6 +8516,7 @@ function seatAskQuestion(period, doc){
   var pick = null, spinning = false, timer = null;
   var cashMode = false;     // right after a Correct: clicking other desks gives them cash too
   var absentMode = false;   // the Mark absent button is on: clicking desks marks absent / here
+  var awardMode = false;    // the Award $ button is on: clicking desks gives cash, no question needed
 
   function slotEl(sid){ return api.room.querySelector('.seatSlot[data-seat="' + (window.CSS && CSS.escape ? CSS.escape(sid) : sid) + '"]'); }
   function redraw(){
@@ -8521,6 +8525,7 @@ function seatAskQuestion(period, doc){
     seated.forEach(function(x){ if (c.round[x.st.id]){ done++; var e = slotEl(x.sid); if (e) e.classList.add("answeredRound"); } });
     ov.querySelector(".seatAskRound").textContent = seated.length ? "This round: " + done + " of " + seated.length + " have answered" : "";
     ov.classList.toggle("absentMode", absentMode);
+    ov.classList.toggle("awardMode", awardMode);
     if (!side.hidden) drawRecord();
   }
   function setButtons(){
@@ -8533,9 +8538,13 @@ function seatAskQuestion(period, doc){
       var c = seatCalls(period), last = c.today[c.today.length - 1], byId = {};
       per.students.forEach(function(st){ byId[st.id] = st; });
       var icon = { c: "💲", a: "✔", s: "⏭" };
-      btns.innerHTML = '<button class="seatAskB spin"' + (none || absentMode ? " disabled" : "") + '>🎯 Ask Question</button>' +
+      btns.innerHTML = '<button class="seatAskB spin"' + (none || absentMode || awardMode ? " disabled" : "") + '>🎯 Ask Question</button>' +
+        '<button class="seatAskB award' + (awardMode ? " on" : "") + '" title="Click desks to give students cash, without asking a question">' + (awardMode ? "✔ Done awarding" : "💲 Award $") + '</button>' +
+        '<button class="seatAskB absent' + (absentMode ? " on" : "") + '" title="Click desks to mark students absent today; click again to bring them back">' + (absentMode ? "✔ Done marking" : "❌ Mark absent") + '</button>' +
         (last ? '<button class="seatAskB undo">↩ Undo ' + icon[last.r] + ' ' + escapeHtml(byId[last.id] ? byId[last.id].name : "") + '</button>' : '');
       btns.querySelector(".spin").onclick = spin;
+      btns.querySelector(".award").onclick = function(){ setMode("award"); };
+      btns.querySelector(".absent").onclick = function(){ setMode("absent"); };
       if (last) btns.querySelector(".undo").onclick = undo;
       if (none && !absentMode) nameEl.textContent = seatSeated(per).length ? "Everyone in " + period + " is absent or out." : "No students are in seats for " + period + " yet.";
     }
@@ -8545,7 +8554,7 @@ function seatAskQuestion(period, doc){
     [].forEach.call(api.room.querySelectorAll(".spinHi,.picked"), function(e){ e.classList.remove("spinHi", "picked"); });
   }
   function spin(){
-    if (spinning || absentMode) return;
+    if (spinning || absentMode || awardMode) return;
     var chosen = seatPickStudent(period);
     if (!chosen) return;
     cashMode = false;
@@ -8640,26 +8649,27 @@ function seatAskQuestion(period, doc){
       var a = seatAbsentSet(period);
       if (a[st.id]) delete a[st.id]; else a[st.id] = 1;
       saveState();
-      nameEl.innerHTML = '<span class="seatAskSmall">' + (a[st.id] ? "🚫 " + escapeHtml(st.name) + " is absent today" : "✔ " + escapeHtml(st.name) + " is here") + '</span>';
+      nameEl.innerHTML = '<span class="seatAskSmall">' + (a[st.id] ? "❌ " + escapeHtml(st.name) + " is absent today" : "✔ " + escapeHtml(st.name) + " is here") + '</span>';
       redraw(); setButtons();
       return;
     }
-    if (!cashMode) return;
+    if (!cashMode && !awardMode) return;
     var why = seatAway(period)[st.id];
     if (why){ nameEl.innerHTML = '<span class="seatAskSmall">' + escapeHtml(st.name) + (why === "out" ? " is out on a pass." : " is marked absent.") + '</span>'; return; }
     seatRecordCall(period, st.id, "c");
     seatSound("cash");
-    nameEl.innerHTML = '<span class="seatAskSmall">💲 ' + escapeHtml(st.name) + ' gets cash too!</span>';
+    nameEl.innerHTML = '<span class="seatAskSmall">💲 ' + escapeHtml(st.name) + (awardMode ? ' gets cash!' : ' gets cash too!') + '</span>';
     redraw(); setButtons();
   });
-  ov.querySelector(".seatAskAbsent").onclick = function(){
+  // Award $ and Mark absent: one at a time; click the same button again when done
+  function setMode(which){
     if (spinning || pick) return;
-    absentMode = !absentMode; cashMode = false;
-    this.classList.toggle("on", absentMode);
-    this.textContent = absentMode ? "✔ Done marking" : "🚫 Mark absent";
-    nameEl.innerHTML = absentMode ? '<span class="seatAskSmall">Click the desks of students who are absent today. Click again if they\'re here.</span>' : "";
+    var on = which === "award" ? !awardMode : !absentMode;
+    awardMode = which === "award" && on; absentMode = which === "absent" && on; cashMode = false;
+    nameEl.innerHTML = awardMode ? '<span class="seatAskSmall">Click the desks of students who get cash. Click ✔ Done awarding when you\'re finished.</span>' :
+      absentMode ? '<span class="seatAskSmall">Click the desks of students who are absent today. Click again if they\'re here.</span>' : "";
     redraw(); setButtons();
-  };
+  }
   function drawRecord(){
     var c = seatCalls(period), byId = {};
     per.students.forEach(function(s){ byId[s.id] = s; });
